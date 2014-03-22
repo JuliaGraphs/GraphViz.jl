@@ -381,6 +381,8 @@ module GraphViz
 
     # API - Graph
 
+    export Graph
+
     type Graph
         handle::Ptr{Void}
         didlayout::Bool
