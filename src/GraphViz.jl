@@ -129,8 +129,53 @@ module GraphViz
         render::Ptr{Void}           # void (*render) (GVJ_t * job, const char *format, const char *filename);
     end
 
+    # TODO: These are probably wrong
+    type GVCOMMON_s
+        info::Ptr{Ptr{Uint8}}
+        cmdname::Ptr{Uint8}
+        verbose::Cint
+        config::Uint8
+        auto_outfile_names::Uint8
+        errorfn::Ptr{Void}
+        show_boxes::Ptr{Ptr{Void}}
+        lib::Ptr{Ptr{Void}}
+        viewNum::Cint
+        builtins::Ptr{Void}
+        demand_loading::Cint
+    end
+
+    type GVC_s
+        common::GVCOMMON_s
+
+        config_path::Ptr{Uint8}
+        config_found::Uint8
+
+        input_filenames::Ptr{Ptr{Uint8}}
+
+        gvgs::Ptr{Void}
+        gvg::Ptr{Void}
+
+        # Hack until tuples are properly inlined into types
+        apis0::Ptr{Void}
+        apis1::Ptr{Void}
+        apis2::Ptr{Void}
+        apis3::Ptr{Void}
+        apis4::Ptr{Void}
+        api0::Ptr{Void}
+        api1::Ptr{Void}
+        api2::Ptr{Void}
+        api3::Ptr{Void}
+        api4::Ptr{Void}
+        packages::Ptr{Void}
+
+        #  size_t (*write_fn) (GVJ_t *job, const char *s, size_t len);
+        write_fn::Ptr{Void}
+
+        # More stuff I don't need right now
+    end
+
     type GVJ_s
-        gvc::Ptr{Void}
+        gvc::Ptr{GVC_s}
         next::Ptr{GVJ_s}
         next_active::Ptr{GVJ_s}
 
@@ -232,6 +277,76 @@ module GraphViz
         keycodes::Ptr{Void}
     end
 
+    # Disciplines
+
+
+    immutable Agmemdisc_s      
+        #void *(*open) (Agdisc_t*);  /* independent of other resources */
+        open::Ptr{Void}
+        #void *(*alloc) (void *state, size_t req);
+        alloc::Ptr{Void}
+        #void *(*resize) (void *state, void *ptr, size_t old, size_t req);
+        resize::Ptr{Void}
+        # void (*free) (void *state, void *ptr);
+        free::Ptr{Void}
+        # void (*close) (void *state);
+        close::Ptr{Void}
+    end
+
+    immutable Agiddisc_s
+        # void *(*open) (Agraph_t * g, Agdisc_t*);    /* associated with a graph */
+        open::Ptr{Void}
+        # long (*map) (void *state, int objtype, char *str, unsigned long *id, int createflag);
+        map::Ptr{Void}
+        # long (*alloc) (void *state, int objtype, unsigned long id);
+        alloc::Ptr{Void}
+        #void (*free) (void *state, int objtype, unsigned long id);
+        free::Ptr{Void}
+        #char *(*print) (void *state, int objtype, unsigned long id);
+        print::Ptr{Void}
+        #void (*close) (void *state);
+        close::Ptr{Void}
+        #void (*idregister) (void *state, int objtype, void *obj);
+        idregister::Ptr{Void}
+    end
+
+    immutable Agiodisc_s
+        # int (*afread) (void *chan, char *buf, int bufsize);
+        afread::Ptr{Void}
+        # int (*putstr) (void *chan, const char *str);
+        putstr::Ptr{Void}
+        # int (*flush) (void *chan);  /* sync */
+        flush::Ptr{Void}
+    end
+
+    immutable Agdisc_s  
+        mem::Ptr{Agmemdisc_s}
+        id::Ptr{Agiddisc_s}
+        io::Ptr{Agiodisc_s}
+    end
+
+    function jl_afread(io::Ptr{Void}, buf::Ptr{Uint8}, bufsize::Cint)
+        #@show (io,buf,bufsize)
+        ret = readbytes!(unsafe_pointer_to_objref(io)::IO,pointer_to_array(buf,int(bufsize)))
+        #@show ret
+        convert(Cint,ret)
+    end
+
+    function jl_putstr(io::Ptr{Void}, str::Ptr{Uint8})
+        #@show (io,str)
+        convert(Cint,write(unsafe_pointer_to_objref(io)::IO,pointer_to_array(str,int(ccall(:strlen,Csize_t,(Ptr{Uint8},),str)))))::Cint
+    end
+
+    jl_flush(io::Ptr{Void}) = convert(Cint,0)
+
+
+    const JuliaIODisc = [Agiodisc_s(
+        cfunction(jl_afread,Cint,(Ptr{Void},Ptr{Uint8},Cint)),
+        cfunction(jl_putstr,Cint,(Ptr{Void},Ptr{Uint8})),
+        cfunction(jl_flush,Cint,(Ptr{Void},))
+    )]
+
+
     null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(int32(0),pointer(Uint8,unsigned(0)),
         int32(0),pointer(gvdevice_engine_t,unsigned(0)),pointer(gvdevice_features_t,unsigned(0)))
     null(::Type{gvplugin_api_t}) = gvplugin_api_t(int32(0),pointer(gvplugin_installed_t,unsigned(0)))
@@ -268,8 +383,9 @@ module GraphViz
 
     type Graph
         handle::Ptr{Void}
+        didlayout::Bool
         function Graph(p::Ptr{Void})
-            this = new(p)
+            this = new(p,false)
             finalizer(this,free)
             this
         end
@@ -282,17 +398,108 @@ module GraphViz
         g.handle = C_NULL
     end
 
-    Graph(graph::Vector{Uint8}) = Graph(ccall((:agmemread,cgraph),Ptr{Void},(Ptr{Uint8},),graph))
+    Graph(graph::IO) = Graph(ccall((:agread,cgraph),Ptr{Void},(Any,Ptr{Void}),graph,[Agdisc_s(
+        cglobal((:AgMemDisc,cgraph)),
+        cglobal((:AgIdDisc,cgraph)),
+        pointer(JuliaIODisc)
+        )]))
+    Graph(graph::Vector{Uint8}) = Graph(IOBuffer(graph))
     Graph(graph::String) = Graph(bytestring(graph).data)
 
-    layout!(c::Context,g::Graph,engine) = ccall((:gvLayout,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8}),c.handle,g.handle,engine)
+    function layout!(g::Graph;engine="neato", context = default_context) 
+        ccall((:gvLayout,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8}),context.handle,g.handle,engine)
+        g.didlayout = true
+    end
 
     render_x11(c::Context,g::Graph) = ccall((:gvRender,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Ptr{Void}),c.handle,g.handle,"x11",C_NULL)
     render_jobs(c::Context,g::Graph) = ccall((:gvRenderJobs,gvc),Cint,(Ptr{Void},Ptr{Void}),c.handle,g.handle)
 
     # Render
 
-    if isdir(Pkg2.dir("Cairo"))
+    # IO device
+
+    type IODeviceState
+        io::IO
+        oldwritefn::Ptr{Void}
+    end
+
+    const active_devices = ObjectIdDict()
+
+    function jlio_write(job::Ptr{Void},s::Ptr{Uint8},len::Csize_t)
+        job = unsafe_load(convert(Ptr{GVJ_s},job))
+        ioc = unsafe_pointer_to_objref(job.context)::IODeviceState
+        write(ioc.io,pointer_to_array(s,int(len)))
+        len #Julia doesn't do half things :)
+    end
+
+    # determined by counting bytes ;)
+    const WRITEFN_OFFSET = 200
+
+    function julia_io_initialize(firstjob::Ptr{Void})
+        #@show firstjob
+        firstjob = convert(Ptr{GVJ_s},firstjob)
+        job = unsafe_load(firstjob)
+        # Temporarily put in our custom write function
+        ioc = unsafe_pointer_to_objref(job.context)::IODeviceState
+        writefnptr = convert(Ptr{Ptr{Void}},job.gvc+WRITEFN_OFFSET)
+        ioc.oldwritefn = unsafe_load(writefnptr)
+        unsafe_store!(writefnptr,cfunction(jlio_write,Csize_t,(Ptr{Void},Ptr{Uint8},Csize_t)))
+        # This function has void return
+        nothing
+    end
+    function julia_io_finalize(firstjob::Ptr{Void}) 
+        # Reset the write pointer we changed in julia_io_initialize
+        firstjob = convert(Ptr{GVJ_s},firstjob)
+        job = unsafe_load(firstjob)
+        ioc = unsafe_pointer_to_objref(job.context)::IODeviceState
+        writefnptr = convert(Ptr{Ptr{Void}},job.gvc+WRITEFN_OFFSET)
+        unsafe_store!(writefnptr,ioc.oldwritefn)
+        # Also remove it from the gc preserve dict
+        haskey(active_devices,ioc) && pop!(active_devices,ioc)
+        nothing
+    end
+
+    const default_context = GraphViz.Context()
+
+    const julia_io_engine = [ gvdevice_engine_t(cfunction(julia_io_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(julia_io_finalize,Void,(Ptr{Void},))) ]
+    const julia_io_features = [ gvdevice_features_t(int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.) ]
+    const julia_io_name = "julia_io:svg".data
+    const julia_io_libname = "julia_io".data 
+    const julia_io_device = 
+    [ 
+      gvplugin_installed_t(int32(0),pointer(julia_io_name), int32(0), pointer(julia_io_engine), pointer(julia_io_features));
+      null(gvplugin_installed_t)
+    ]
+    const julia_io_api = 
+    [
+        gvplugin_api_t(API_device, pointer(julia_io_device))
+        null(gvplugin_api_t)
+    ]
+
+    add_julia_io!(c::Context) = ccall((:gvAddLibrary,gvc),Void,(Ptr{Void},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(julia_io_libname),pointer(julia_io_api))])
+
+    function render(io::IO,g::GraphViz.Graph; context = default_context, format="julia_io:svg")
+        GraphViz.add_julia_io!(context)
+        if !g.didlayout
+            error("Must call layout before calling render!")
+        end
+        state = IODeviceState(io,C_NULL)
+        active_devices[state] = state
+        ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),context.handle,g.handle,format,state)
+    end
+
+    import Base: writemime
+
+    function writemime(io::IO, ::MIME"image/svg+xml", x::Graph) 
+        if !x.didlayout
+            layout!(x,engine="neato")
+        end
+        render(io,x)
+    end
+
+    # Cairo device
+
+    if isdir(Pkg.dir("Cairo"))
         using Cairo
 
         function cairo_initialize(firstjob::Ptr{Void})
@@ -300,10 +507,10 @@ module GraphViz
             job = unsafe_load(firstjob)
             c = unsafe_pointer_to_objref(job.context)::CairoContext
             job.context = c.ptr
+            job.external_context    = 0x1
             job.width = width(c.surface)
             job.height = height(c.surface)
             unsafe_store!(firstjob,job)
-            job = unsafe_load(firstjob)
             nothing
         end
         cairo_finalize(firstjob::Ptr{Void}) = nothing
@@ -312,7 +519,7 @@ module GraphViz
         const generic_cairo_features = [ gvdevice_features_t(int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_features_interactive = [ gvdevice_features_t(int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_name = "julia:cairo".data
-        const generic_cairo_libname = "julia_cairo".data 
+        const generic_cairo_libname = "julia:cairo".data 
         const generic_cairo_device = 
         [ 
           gvplugin_installed_t(int32(0),pointer(generic_cairo_name), int32(0), pointer(generic_cairo_engine), pointer(generic_cairo_features));
@@ -326,9 +533,13 @@ module GraphViz
 
         add_julia_cairo!(c::Context) = ccall((:gvAddLibrary,gvc),Void,(Ptr{Void},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(generic_cairo_libname),pointer(generic_cairo_api))])
 
-        render(c::CairoContext,cg::Context,g::Graph,format="julia:cairo") = ccall((:gvRenderContext,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),cg.handle,g.handle,format,c)
+        function render(c::CairoContext,cg::Context,g::Graph,format="julia:cairo") 
+            add_julia_cairo!(cg)
+            ccall((:gvRenderContext,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),cg.handle,g.handle,format,c)
+        end
     
-        if isdir(Pkg2.dir("Gtk"))
+        #=
+        if isdir(Pkg.dir("Gtk"))
             using Gtk
 
             function gtk_initialize(firstjob::Ptr{Void})
@@ -388,6 +599,7 @@ module GraphViz
                 nothing
             end     
         end
+        =#
     end
 
     graph_plugins(c::Context) = Graph(ccall((:gvPluginsGraph,gvc),Ptr{Void},(Ptr{Void},),c.handle))

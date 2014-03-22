@@ -1,8 +1,8 @@
 using BinDeps
 
 # Configuration / Autodetections
-const x11 = @unix? true : false
-const gtk = isdir(Pkg2.dir("Gtk"))
+const x11 = @unix? (OS_NAME != :Darwin) : false
+const gtk = isdir(Pkg.dir("Gtk"))
 
 @BinDeps.setup
 
@@ -14,11 +14,13 @@ gvc = library_dependency("gvc",aliases = ["libgvc"])
 graphviz = [cgraph,gvc]
 
 options = String[]
-x11 && push!(options,"--with-x")
+x11 ? push!(options,"--with-x") : push!(options,"--without-x")
 gtk && push!(options,"--with-gtk")
 push!(options,"--without-qt")
+push!(options,"--with-pangocairo")
+push!(options,"--enable-debug")
 
-provides(Sources,URI("http://www.graphviz.org/pub/graphviz/development/SOURCES/graphviz-2.33.20130807.0447.tar.gz"),graphviz)
+provides(Sources,URI("http://www.graphviz.org/pub/graphviz/stable/SOURCES/graphviz-2.36.0.tar.gz"),graphviz)
 provides(BuildProcess,Autotools(libtarget = "lib/cgraph/.libs/libcgraph."*BinDeps.shlib_ext,configure_options=options),graphviz)
 
 # Ubuntu GraphViz is too old
