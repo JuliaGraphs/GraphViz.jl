@@ -510,16 +510,16 @@ module GraphViz
             c = unsafe_pointer_to_objref(job.context)::CairoContext
             job.context = c.ptr
             job.external_context    = 0x1
-            job.width = width(c.surface)
-            job.height = height(c.surface)
+            #job.width = width(c.surface)
+            #job.height = height(c.surface)
             unsafe_store!(firstjob,job)
             nothing
         end
         cairo_finalize(firstjob::Ptr{Void}) = nothing
 
         const generic_cairo_engine = [ gvdevice_engine_t(cfunction(cairo_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(cairo_finalize,Void,(Ptr{Void},))) ]
-        const generic_cairo_features = [ gvdevice_features_t(int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
-        const generic_cairo_features_interactive = [ gvdevice_features_t(int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
+        const generic_cairo_features = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
+        const generic_cairo_features_interactive = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_name = "julia:cairo".data
         const generic_cairo_libname = "julia:cairo".data 
         const generic_cairo_device = 
@@ -535,11 +535,24 @@ module GraphViz
 
         add_julia_cairo!(c::Context) = ccall((:gvAddLibrary,gvc),Void,(Ptr{Void},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(generic_cairo_libname),pointer(generic_cairo_api))])
 
-        function render(c::CairoContext,cg::Context,g::Graph,format="julia:cairo") 
-            add_julia_cairo!(cg)
-            ccall((:gvRenderContext,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),cg.handle,g.handle,format,c)
+        function render(c::CairoContext,g::GraphViz.Graph; context = default_context, format="julia:cairo")
+            GraphViz.add_julia_cairo!(context)
+            if !g.didlayout
+                error("Must call layout before calling render!")
+            end
+            ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),context.handle,g.handle,format,c)
         end
-    
+
+        function writemime(io::IO, m::MIME"image/png", x::Graph)
+            if !x.didlayout
+                layout!(x,engine="neato")
+            end
+            c = CairoRGBSurface(256,256);
+            cr = CairoContext(c);
+            set_source_rgb(cr,1.0,1.0,1.0);    # white
+            render(cr,x)
+            writemime(io, m, c)
+        end
         #=
         if isdir(Pkg.dir("Gtk"))
             using Gtk
