@@ -347,9 +347,9 @@ module GraphViz
     )]
 
 
-    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(int32(0),pointer(Uint8,unsigned(0)),
-        int32(0),pointer(gvdevice_engine_t,unsigned(0)),pointer(gvdevice_features_t,unsigned(0)))
-    null(::Type{gvplugin_api_t}) = gvplugin_api_t(int32(0),pointer(gvplugin_installed_t,unsigned(0)))
+    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(int32(0),convert(Ptr{Uint8},0),
+        int32(0),convert(Ptr{gvdevice_engine_t},0),convert(Ptr{gvdevice_features_t},0))
+    null(::Type{gvplugin_api_t}) = gvplugin_api_t(int32(0),convert(Ptr{gvplugin_installed_t},0))
 
     # Initialization
 
