@@ -492,7 +492,7 @@ module GraphViz
 
     import Base: writemime
 
-    function writemime(io::IO, ::MIME"image/svg+xml", x::Graph) 
+    function writemime(io::IO, ::MIME"image/svg+xml", x::Graph)
         if !x.didlayout
             layout!(x,engine="neato")
         end
@@ -507,17 +507,44 @@ module GraphViz
         function cairo_initialize(firstjob::Ptr{Void})
             firstjob = convert(Ptr{GVJ_s},firstjob)
             job = unsafe_load(firstjob)
-            c = unsafe_pointer_to_objref(job.context)::CairoContext
-            job.context = c.ptr
-            job.external_context    = 0x1
-            #job.width = width(c.surface)
-            #job.height = height(c.surface)
-            unsafe_store!(firstjob,job)
+            if job.context != C_NULL
+                c = unsafe_pointer_to_objref(job.context)::CairoContext
+                job.context = c.ptr
+                job.external_context    = 0x1
+                job.width = width(c.surface)
+                job.height = height(c.surface)
+                unsafe_store!(firstjob,job)
+            else
+                job.external_context = 1
+                unsafe_store!(firstjob,job)
+                global last_surface = firstjob
+            end
             nothing
         end
-        cairo_finalize(firstjob::Ptr{Void}) = nothing
 
-        const generic_cairo_engine = [ gvdevice_engine_t(cfunction(cairo_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(cairo_finalize,Void,(Ptr{Void},))) ]
+        global last_surface = nothing
+
+        function cairo_finalize(firstjob::Ptr{Void})
+            #=firstjob = convert(Ptr{GVJ_s},firstjob)
+            job = unsafe_load(firstjob)
+            if last_surface == firstjob
+                surface = ccall(:cairo_get_target,Ptr{Void},(Ptr{Void},),job.context)
+                last_surface = CairoSurface(surface, job.width, job.height)
+            end=#
+            nothing
+        end
+
+        function cairo_format(firstjob::Ptr{Void})
+            firstjob = convert(Ptr{GVJ_s},firstjob)
+            job = unsafe_load(firstjob)
+            if last_surface == firstjob
+                surface = ccall(:cairo_get_target,Ptr{Void},(Ptr{Void},),job.context)
+                last_surface = CairoSurface(surface, job.width, job.height)
+            end
+            nothing
+        end
+
+        const generic_cairo_engine = [ gvdevice_engine_t(cfunction(cairo_initialize,Void,(Ptr{Void},)),cfunction(cairo_format,Void,(Ptr{Void},)),cfunction(cairo_finalize,Void,(Ptr{Void},))) ]
         const generic_cairo_features = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_features_interactive = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_name = "julia:cairo".data
@@ -543,15 +570,23 @@ module GraphViz
             ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),context.handle,g.handle,format,c)
         end
 
+        function cairo_render(g::GraphViz.Graph; context = default_context, format="julia:cairo")
+            global last_surface
+            GraphViz.add_julia_cairo!(context)
+            if !g.didlayout
+                error("Must call layout before calling render!")
+            end
+            ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Ptr{Void}),context.handle,g.handle,format,C_NULL)
+            surface = last_surface
+            last_surface = nothing
+            return surface
+        end
+
         function writemime(io::IO, m::MIME"image/png", x::Graph)
             if !x.didlayout
-                layout!(x,engine="neato")
+                layout!(x,engine="dot")
             end
-            c = CairoRGBSurface(256,256);
-            cr = CairoContext(c);
-            set_source_rgb(cr,1.0,1.0,1.0);    # white
-            render(cr,x)
-            writemime(io, m, c)
+            writemime(io, m, cairo_render(x))
         end
         #=
         if isdir(Pkg.dir("Gtk"))
