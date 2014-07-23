@@ -23,7 +23,7 @@ Graph("""
 After obtaining the package through the package manager, the following suffices to load the package:
 
 ```
-using Graphviz
+using GraphViz
 ```
 
 Note that graphviz has many configuration options. In particular, both the Cairo and the GTK backends may be disabled
