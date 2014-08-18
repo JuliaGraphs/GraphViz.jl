@@ -354,12 +354,6 @@ module GraphViz
         int32(0),convert(Ptr{gvdevice_engine_t},0),convert(Ptr{gvdevice_features_t},0))
     null(::Type{gvplugin_api_t}) = gvplugin_api_t(int32(0),convert(Ptr{gvplugin_installed_t},0))
 
-    # Initialization
-
-    function init()
-        ccall((:aginit,cgraph),Void,())
-    end
-
     # Memory interface
 
     # I/O interface
@@ -411,7 +405,8 @@ module GraphViz
     Graph(graph::Vector{Uint8}) = Graph(IOBuffer(graph))
     Graph(graph::String) = Graph(bytestring(graph).data)
 
-    function layout!(g::Graph;engine="neato", context = default_context) 
+    function layout!(g::Graph;engine="neato", context = default_context)
+        @assert g.handle != C_NULL
         ccall((:gvLayout,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8}),context.handle,g.handle,engine)
         g.didlayout = true
     end
@@ -650,7 +645,7 @@ module GraphViz
                     ccall((:gvRenderContext,gvc),Cint,(Ptr{Void},Ptr{Void},Ptr{Uint8},Any),cg.handle,g.handle,"julia_gtk",c)    
                 end
                 nothing
-            end     
+            end
         end
         =#
     end
@@ -671,7 +666,4 @@ module GraphViz
         c_free(r)
         ret
     end
-
 end
-
-GraphViz.init()
