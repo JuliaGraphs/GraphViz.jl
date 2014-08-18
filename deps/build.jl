@@ -32,4 +32,4 @@ provides(BuildProcess,Autotools(libtarget = "lib/cgraph/.libs/libcgraph."*BinDep
 # Ubuntu GraphViz is too old
 # provides(AptGet,"graphviz",graphviz)
 
-@BinDeps.install
+@BinDeps.install [ :cgraph => :cgraph, :gvc => :gvc ]

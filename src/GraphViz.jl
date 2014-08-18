@@ -1,6 +1,9 @@
 module GraphViz
-    using BinDeps
-    @BinDeps.load_dependencies
+    if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
+        include("../deps/deps.jl")
+    else
+        error("GraphViz not properly installed. Please run Pkg.build(\"GraphViz\").")
+    end
 
     # Plugin Struct
 
