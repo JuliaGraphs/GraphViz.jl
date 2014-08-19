@@ -20,6 +20,7 @@ graphviz = [cgraph,gvc]
     function __init__()
         ENV["GVBINDIR"] = Pkg.dir("Homebrew","deps","usr","lib","graphviz")
     end
+    __init__()
     end
     """)
 end
