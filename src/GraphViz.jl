@@ -526,7 +526,7 @@ module GraphViz
             #=firstjob = convert(Ptr{GVJ_s},firstjob)
             job = unsafe_load(firstjob)
             if last_surface == firstjob
-                surface = ccall(:cairo_get_target,Ptr{Void},(Ptr{Void},),job.context)
+                surface = ccall((:cairo_get_target,Cairo._jl_libcairo),Ptr{Void},(Ptr{Void},),job.context)
                 last_surface = CairoSurface(surface, job.width, job.height)
             end=#
             nothing
@@ -536,7 +536,7 @@ module GraphViz
             firstjob = convert(Ptr{GVJ_s},firstjob)
             job = unsafe_load(firstjob)
             if last_surface == firstjob
-                surface = ccall(:cairo_get_target,Ptr{Void},(Ptr{Void},),job.context)
+                surface = ccall((:cairo_get_target,Cairo._jl_libcairo),Ptr{Void},(Ptr{Void},),job.context)
                 last_surface = CairoSurface(surface, job.width, job.height)
             end
             nothing
