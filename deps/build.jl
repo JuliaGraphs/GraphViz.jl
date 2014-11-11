@@ -15,7 +15,7 @@ graphviz = [cgraph,gvc]
 
 @osx_only begin
     using Homebrew
-    provides( Homebrew.HB, "graphviz", graphviz, os = :Darwin, onload = """
+    provides( Homebrew.HB, "graphviz", graphviz, os = :Darwin, preload = """
     module GraphVizInit
     function __init__()
         ENV["GVBINDIR"] = Pkg.dir("Homebrew","deps","usr","lib","graphviz")
