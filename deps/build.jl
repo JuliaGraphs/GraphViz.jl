@@ -19,6 +19,7 @@ graphviz = [cgraph,gvc]
     module GraphVizInit
     function __init__()
         ENV["GVBINDIR"] = Pkg.dir("Homebrew","deps","usr","lib","graphviz")
+        ENV["PANGO_SYSCONFDIR"] = joinpath("$(Homebrew.prefix())", "etc")
     end
     __init__()
     end
