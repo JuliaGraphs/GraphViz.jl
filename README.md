@@ -9,7 +9,6 @@ If you already have a graph you would like to work with, the following code snip
 at the "Simple Examples" section below
 ```
 using GraphViz
-open(Graph,"mygraph.dot")
 Graph("""
  digraph graphname {
      a -> b -> c;
