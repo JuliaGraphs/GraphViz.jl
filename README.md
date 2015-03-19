@@ -9,13 +9,7 @@ If you already have a graph you would like to work with, the following code snip
 at the "Simple Examples" section below
 ```
 using GraphViz
-open(Graph,"mygraph.dot")
-Graph("""
- digraph graphname {
-     a -> b -> c;
-     b -> d;
- }
-""")
+open(x->Graph(x), "mygraph.dot")
 ```
 
 # Usage
@@ -31,6 +25,15 @@ by default.
 
 # Simple Examples
 Try the following in an IJulia Notebook (this example is taken from (here)[http://en.wikipedia.org/wiki/DOT_(graph_description_language)]:
+
+```
+Graph("""
+ digraph graphname {
+     a -> b -> c;
+     b -> d;
+ }
+""")
+```
 
 ```
 Graph("""
