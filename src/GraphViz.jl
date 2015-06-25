@@ -1,4 +1,6 @@
 module GraphViz
+    using Compat
+
     if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
         include("../deps/deps.jl")
     else
@@ -36,11 +38,11 @@ module GraphViz
         features::Ptr{gvdevice_features_t}
     end
 
-    const API_render        = int32(0)
-    const API_layout        = int32(1)
-    const API_textlayout    = int32(2)
-    const API_device        = int32(3)
-    const API_loadimage     = int32(4)
+    const API_render        = @compat Int32(0)
+    const API_layout        = @compat Int32(1)
+    const API_textlayout    = @compat Int32(2)
+    const API_device        = @compat Int32(3)
+    const API_loadimage     = @compat Int32(4)
 
     const EMIT_SORTED                   = (1<<0)
     const EMIT_COLORS                   = (1<<1)
@@ -322,7 +324,7 @@ module GraphViz
         flush::Ptr{Void}
     end
 
-    immutable Agdisc_s  
+    immutable Agdisc_s
         mem::Ptr{Agmemdisc_s}
         id::Ptr{Agiddisc_s}
         io::Ptr{Agiodisc_s}
@@ -330,14 +332,14 @@ module GraphViz
 
     function jl_afread(io::Ptr{Void}, buf::Ptr{Uint8}, bufsize::Cint)
         #@show (io,buf,bufsize)
-        ret = readbytes!(unsafe_pointer_to_objref(io)::IO,pointer_to_array(buf,int(bufsize)))
+        ret = readbytes!(unsafe_pointer_to_objref(io)::IO,pointer_to_array(buf,@compat Int(bufsize)))
         #@show ret
         convert(Cint,ret)
     end
 
     function jl_putstr(io::Ptr{Void}, str::Ptr{Uint8})
         #@show (io,str)
-        convert(Cint,write(unsafe_pointer_to_objref(io)::IO,pointer_to_array(str,int(ccall(:strlen,Csize_t,(Ptr{Uint8},),str)))))::Cint
+        convert(Cint,write(unsafe_pointer_to_objref(io)::IO,pointer_to_array(str,@compat Int(ccall(:strlen,Csize_t,(Ptr{Uint8},),str)))))::Cint
     end
 
     jl_flush(io::Ptr{Void}) = convert(Cint,0)
@@ -350,9 +352,9 @@ module GraphViz
     )]
 
 
-    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(int32(0),convert(Ptr{Uint8},0),
-        int32(0),convert(Ptr{gvdevice_engine_t},0),convert(Ptr{gvdevice_features_t},0))
-    null(::Type{gvplugin_api_t}) = gvplugin_api_t(int32(0),convert(Ptr{gvplugin_installed_t},0))
+    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t((@compat Int32(0)),convert(Ptr{Uint8},0),
+        (@compat Int32(0)),convert(Ptr{gvdevice_engine_t},0),convert(Ptr{gvdevice_features_t},0))
+    null(::Type{gvplugin_api_t}) = gvplugin_api_t((@compat Int32(0)),convert(Ptr{gvplugin_installed_t},0))
 
     # Memory interface
 
@@ -428,7 +430,7 @@ module GraphViz
     function jlio_write(job::Ptr{Void},s::Ptr{Uint8},len::Csize_t)
         job = unsafe_load(convert(Ptr{GVJ_s},job))
         ioc = unsafe_pointer_to_objref(job.context)::IODeviceState
-        write(ioc.io,pointer_to_array(s,int(len)))
+        write(ioc.io,pointer_to_array(s,@compat Int(len)))
         len #Julia doesn't do half things :)
     end
 
@@ -462,12 +464,12 @@ module GraphViz
     const default_context = GraphViz.Context()
 
     const julia_io_engine = [ gvdevice_engine_t(cfunction(julia_io_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(julia_io_finalize,Void,(Ptr{Void},))) ]
-    const julia_io_features = [ gvdevice_features_t(int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.) ]
+    const julia_io_features = [ gvdevice_features_t((@compat Int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS)),0.,0.,0.,0.,72.,72.) ]
     const julia_io_name = "julia_io:svg".data
     const julia_io_libname = "julia_io".data 
     const julia_io_device = 
     [ 
-      gvplugin_installed_t(int32(0),pointer(julia_io_name), int32(0), pointer(julia_io_engine), pointer(julia_io_features));
+      gvplugin_installed_t((@compat Int32(0)),pointer(julia_io_name), (@compat Int32(0)), pointer(julia_io_engine), pointer(julia_io_features));
       null(gvplugin_installed_t)
     ]
     const julia_io_api = 
@@ -533,6 +535,7 @@ module GraphViz
         end
 
         function cairo_format(firstjob::Ptr{Void})
+            global last_surface
             firstjob = convert(Ptr{GVJ_s},firstjob)
             job = unsafe_load(firstjob)
             if last_surface == firstjob
@@ -543,13 +546,13 @@ module GraphViz
         end
 
         const generic_cairo_engine = [ gvdevice_engine_t(cfunction(cairo_initialize,Void,(Ptr{Void},)),cfunction(cairo_format,Void,(Ptr{Void},)),cfunction(cairo_finalize,Void,(Ptr{Void},))) ]
-        const generic_cairo_features = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
-        const generic_cairo_features_interactive = [ gvdevice_features_t(int32(0),0.,0.,0.,0.,96.,96.) ]
+        const generic_cairo_features = [ gvdevice_features_t((@compat Int32(0)),0.,0.,0.,0.,96.,96.) ]
+        const generic_cairo_features_interactive = [ gvdevice_features_t((@compat Int32(0)),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_name = "julia:cairo".data
         const generic_cairo_libname = "julia:cairo".data 
         const generic_cairo_device = 
         [ 
-          gvplugin_installed_t(int32(0),pointer(generic_cairo_name), int32(0), pointer(generic_cairo_engine), pointer(generic_cairo_features));
+          gvplugin_installed_t((@compat Int32(0)),pointer(generic_cairo_name), (@compat Int32(0)), pointer(generic_cairo_engine), pointer(generic_cairo_features));
           null(gvplugin_installed_t)
         ]
         const generic_cairo_api = 
@@ -623,12 +626,12 @@ module GraphViz
                 ccall(unsafe_load(job.callbacks).refresh,Void,(Ptr{Void},),jobp)
             end
             const gtk_engine = [ gvdevice_engine_t(cfunction(gtk_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(gtk_finalize,Void,(Ptr{Void},))) ]
-            const gtk_features = [ gvdevice_features_t(int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
+            const gtk_features = [ gvdevice_features_t(Int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
             const gtk_name = "julia_gtk:cairo".data
             const gtk_libname = "julia_gtk:cairo".data 
             const gtk_device = 
             [ 
-              gvplugin_installed_t(int32(0),pointer(gtk_name), int32(0), pointer(gtk_engine), pointer(gtk_features));
+              gvplugin_installed_t(Int32(0),pointer(gtk_name), Int32(0), pointer(gtk_engine), pointer(gtk_features));
               null(gvplugin_installed_t)
             ]
             const gtk_api = 
