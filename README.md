@@ -30,7 +30,7 @@ Note that graphviz has many configuration options. In particular, both the Cairo
 by default.
 
 # Simple Examples
-Try the following in an IJulia Notebook (this example is taken from (here)[http://en.wikipedia.org/wiki/DOT_(graph_description_language)]:
+Try the following in an IJulia Notebook (this example is taken from [here](http://en.wikipedia.org/wiki/DOT_(graph_description_language))):
 
 ```
 Graph("""
