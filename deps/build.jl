@@ -1,5 +1,5 @@
 using BinDeps
-
+using Base.Libdl
 # Configuration / Autodetections
 const x11 = @unix? (OS_NAME != :Darwin) : false
 const gtk = isdir(Pkg.dir("Gtk"))
@@ -39,4 +39,4 @@ provides(BuildProcess,Autotools(libtarget = "lib/cgraph/.libs/libcgraph."*BinDep
 # Ubuntu GraphViz is too old
 # provides(AptGet,"graphviz",graphviz)
 
-@BinDeps.install [ :cgraph => :cgraph, :gvc => :gvc ]
+@BinDeps.install Dict( :cgraph => :cgraph, :gvc => :gvc )
