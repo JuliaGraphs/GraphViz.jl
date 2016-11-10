@@ -1,19 +1,19 @@
 using BinDeps
 
 # Configuration / Autodetections
-const x11 = @unix? (OS_NAME != :Darwin) : false
+const x11 = is_unix() ? !is_apple() : false
 const gtk = isdir(Pkg.dir("Gtk"))
 
 @BinDeps.setup
 
 cgraph = library_dependency("cgraph",aliases = ["libcgraph","libcgraph.so.5"], validate = function(p,h)
-    dlsym_e(h,:agmemread) != C_NULL
+    Libdl.dlsym_e(h,:agmemread) != C_NULL
 end)
 gvc = library_dependency("gvc",aliases = ["libgvc"])
 
 graphviz = [cgraph,gvc]
 
-@osx_only begin
+if is_apple()
     using Homebrew
     provides( Homebrew.HB, "graphviz", graphviz, os = :Darwin, preload = """
     module GraphVizInit
@@ -39,4 +39,4 @@ provides(BuildProcess,Autotools(libtarget = "lib/cgraph/.libs/libcgraph."*BinDep
 # Ubuntu GraphViz is too old
 # provides(AptGet,"graphviz",graphviz)
 
-@BinDeps.install [ :cgraph => :cgraph, :gvc => :gvc ]
+@BinDeps.install Dict(:cgraph => :cgraph, :gvc => :gvc)
