@@ -646,7 +646,6 @@ module GraphViz
                 nothing
             end
         end
-        =#
     end
 
     graph_plugins(c::Context) = Graph(ccall((:gvPluginsGraph,gvc),Ptr{Void},(Ptr{Void},),c.handle))
