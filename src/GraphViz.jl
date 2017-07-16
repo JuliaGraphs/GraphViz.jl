@@ -403,7 +403,7 @@ module GraphViz
         pointer(JuliaIODisc)
         )]))
     Graph(graph::Vector{UInt8}) = Graph(IOBuffer(graph))
-    Graph(graph::String) = Graph(graph.data)
+    Graph(graph::String) = Graph(Vector{UInt8}(graph))
 
     function layout!(g::Graph;engine="neato", context = default_context)
         @assert g.handle != C_NULL
@@ -463,8 +463,8 @@ module GraphViz
 
     const julia_io_engine = [ gvdevice_engine_t(cfunction(julia_io_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(julia_io_finalize,Void,(Ptr{Void},))) ]
     const julia_io_features = [ gvdevice_features_t(Int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.) ]
-    const julia_io_name = "julia_io:svg".data
-    const julia_io_libname = "julia_io".data 
+    const julia_io_name = Vector{UInt8}("julia_io:svg")
+    const julia_io_libname = Vector{UInt8}("julia_io")
     const julia_io_device = 
     [ 
       gvplugin_installed_t(Int32(0),pointer(julia_io_name), Int32(0), pointer(julia_io_engine), pointer(julia_io_features));
@@ -544,8 +544,8 @@ module GraphViz
         const generic_cairo_engine = [ gvdevice_engine_t(cfunction(cairo_initialize,Void,(Ptr{Void},)),cfunction(cairo_format,Void,(Ptr{Void},)),cfunction(cairo_finalize,Void,(Ptr{Void},))) ]
         const generic_cairo_features = [ gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.) ]
         const generic_cairo_features_interactive = [ gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.) ]
-        const generic_cairo_name = "julia:cairo".data
-        const generic_cairo_libname = "julia:cairo".data 
+        const generic_cairo_name = Vector{UInt8}("julia:cairo")
+        const generic_cairo_libname = Vector{UInt8}("julia:cairo")
         const generic_cairo_device = 
         [ 
           gvplugin_installed_t(Int32(0),pointer(generic_cairo_name), Int32(0), pointer(generic_cairo_engine), pointer(generic_cairo_features));
@@ -623,8 +623,8 @@ module GraphViz
             end
             const gtk_engine = [ gvdevice_engine_t(cfunction(gtk_initialize,Void,(Ptr{Void},)),C_NULL,cfunction(gtk_finalize,Void,(Ptr{Void},))) ]
             const gtk_features = [ gvdevice_features_t(Int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
-            const gtk_name = "julia_gtk:cairo".data
-            const gtk_libname = "julia_gtk:cairo".data 
+            const gtk_name = Vector{UInt8}("julia_gtk:cairo")
+            const gtk_libname = Vector{UInt8}("julia_gtk:cairo")
             const gtk_device = 
             [ 
               gvplugin_installed_t(Int32(0),pointer(gtk_name), Int32(0), pointer(gtk_engine), pointer(gtk_features));
