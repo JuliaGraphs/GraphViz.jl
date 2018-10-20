@@ -1,8 +1,11 @@
 using BinDeps
 
+import Cairo
+const cairo_dir = joinpath(dirname(pathof(Cairo)), "..")
+
 # Configuration / Autodetections
-const x11 = is_unix() ? !is_apple() : false
-const gtk = isdir(Pkg.dir("Gtk"))
+const x11 = Sys.isunix() ? !Sys.isapple() : false
+const gtk = try import Gtk; true catch; false end
 
 @BinDeps.setup
 
@@ -13,12 +16,13 @@ gvc = library_dependency("gvc",aliases = ["libgvc"])
 
 graphviz = [cgraph,gvc]
 
-if is_apple()
+if Sys.isapple()
     using Homebrew
     provides( Homebrew.HB, "graphviz", graphviz, os = :Darwin, preload = """
     module GraphVizInit
+    import Homebrew
     function __init__()
-        ENV["GVBINDIR"] = Pkg.dir("Homebrew","deps","usr","lib","graphviz")
+        ENV["GVBINDIR"] = joinpath(dirname(pathof(Homebrew)),"..","deps","usr","lib","graphviz")
         ENV["PANGO_SYSCONFDIR"] = joinpath("$(Homebrew.prefix())", "etc")
     end
     __init__()
@@ -35,7 +39,7 @@ push!(options,"--enable-debug")
 
 provides(Sources,URI("http://www.graphviz.org/pub/graphviz/stable/SOURCES/graphviz-2.36.0.tar.gz"),graphviz)
 provides(BuildProcess,Autotools(libtarget = "lib/cgraph/.libs/libcgraph."*BinDeps.shlib_ext,configure_options=options,
-    pkg_config_dirs=[Pkg.dir("Cairo","deps","usr","lib","pkgconfig")]),graphviz)
+    pkg_config_dirs=[joinpath(cairo_dir,"deps","usr","lib","pkgconfig")]),graphviz)
 
 # Ubuntu GraphViz is too old
 # provides(AptGet,"graphviz",graphviz)
