@@ -1,353 +1,24 @@
 module GraphViz
-    if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
-        include("../deps/deps.jl")
-    else
-        error("GraphViz not properly installed. Please run Pkg.build(\"GraphViz\").")
-    end
 
-    # Plugin Struct
+    using Requires
+    using Graphviz_jll
+    using Base: unsafe_convert
 
-    struct gvdevice_engine_t
-        initialize::Ptr{Cvoid}
-        format::Ptr{Cvoid}
-        finalize::Ptr{Cvoid}
-    end
+    include("capi.jl")
 
-    struct Pointf
-        x::Float64
-        y::Float64
-    end
-
-    struct gvdevice_features_t
-        flags::Cint
-        default_margin_x::Float64
-        default_margin_y::Float64
-        default_pagesize_x::Float64
-        default_pagesize_y::Float64
-        default_dpi_x::Float64
-        default_dpi_y::Float64
-    end
-
-    struct gvplugin_installed_t
-        id::Cint
-        ctype::Ptr{UInt8}
-        quality::Cint
-        engine::Ptr{gvdevice_engine_t}
-        features::Ptr{gvdevice_features_t}
-    end
-
-    const API_render        = Int32(0)
-    const API_layout        = Int32(1)
-    const API_textlayout    = Int32(2)
-    const API_device        = Int32(3)
-    const API_loadimage     = Int32(4)
-
-    const EMIT_SORTED                   = (1<<0)
-    const EMIT_COLORS                   = (1<<1)
-    const EMIT_CLUSTERS_LAST            = (1<<2)
-    const EMIT_PREORDER                 = (1<<3)
-    const EMIT_EDGE_SORTED              = (1<<4)
-    const GVDEVICE_DOES_PAGES           = (1<<5)
-    const GVDEVICE_DOES_LAYERS          = (1<<6)
-    const GVDEVICE_EVENTS               = (1<<7)
-    const GVDEVICE_DOES_TRUECOLOR       = (1<<8)
-    const GVDEVICE_BINARY_FORMAT        = (1<<9)
-    const GVDEVICE_COMPRESSED_FORMAT    = (1<<10)
-    const GVDEVICE_NO_WRITER            = (1<<11)
-    const GVRENDER_Y_GOES_DOWN          = (1<<12)
-    const GVRENDER_DOES_TRANSFORM       = (1<<13)
-    const GVRENDER_DOES_ARROWS          = (1<<14)
-    const GVRENDER_DOES_LABELS          = (1<<15)
-    const GVRENDER_DOES_MAPS            = (1<<16)
-    const GVRENDER_DOES_MAP_RECTANGLE   = (1<<17)
-    const GVRENDER_DOES_MAP_CIRCLE      = (1<<18)
-    const GVRENDER_DOES_MAP_POLYGON     = (1<<19)
-    const GVRENDER_DOES_MAP_ELLIPSE     = (1<<20)
-    const GVRENDER_DOES_MAP_BSPLINE     = (1<<21)
-    const GVRENDER_DOES_TOOLTIPS        = (1<<22)
-    const GVRENDER_DOES_TARGETS         = (1<<23)
-    const GVRENDER_DOES_Z               = (1<<24)
-    const GVRENDER_NO_WHITE_BG          = (1<<25)
-    const LAYOUT_NOT_REQUIRED           = (1<<26)
-    const OUTPUT_NOT_REQUIRED           = (1<<27)
-
-
-    struct gvplugin_api_t
-        api::Cint
-        types::Ptr{gvplugin_installed_t}
-    end
-
-    struct gvplugin_library_t
-        name::Ptr{UInt8}
-        apis::Ptr{gvplugin_api_t}
-    end
-
-    # Job Struct
-
-    struct gvplugin_active_device_t
-        engine::Ptr{gvdevice_engine_t}
-        id::Cint
-        features::Ptr{gvdevice_features_t}
-        ctype::Ptr{UInt8}
-    end
-
-    struct gvplugin_active_render_t
-        engine::Ptr{Cvoid}
-        id::Cint
-        features::Ptr{Cvoid}
-        ctype::Ptr{UInt8}
-    end
-
-    struct gvplugin_active_loadimage_t
-        engine::Ptr{Cvoid}
-        id::Cint
-        ctype::Ptr{UInt8}
-    end
-
-    struct gv_argvlist_t
-        argv::Ptr{Ptr{UInt8}}
-        argc::Cint;
-        alloc::Cint;
-    end
-
-    struct Point{T}
-        x::T
-        y::T
-    end
-
-    struct Box{T}
-        topleft::Point{T}
-        bottomright::Point{T}
-    end
-
-    struct gvdevice_callback_t
-        refresh::Ptr{Cvoid}          # void (*refresh) (GVJ_t * job);
-        button_press::Ptr{Cvoid}     # void (*button_press) (GVJ_t * job, int button, pointf pointer);
-        button_release::Ptr{Cvoid}   # void (*button_release) (GVJ_t * job, int button, pointf pointer);
-        motion::Ptr{Cvoid}           # void (*motion) (GVJ_t * job, pointf pointer);
-        modify::Ptr{Cvoid}           # void (*modify) (GVJ_t * job, const char *name, const char *value);
-        del::Ptr{Cvoid}              # void (*del) (GVJ_t * job);  /* can't use "delete" 'cos C++ stole it */
-        read::Ptr{Cvoid}             # void (*read) (GVJ_t * job, const char *filename, const char *layout);
-        layout::Ptr{Cvoid}           # void (*layout) (GVJ_t * job, const char *layout);
-        render::Ptr{Cvoid}           # void (*render) (GVJ_t * job, const char *format, const char *filename);
-    end
-
-    # TODO: These are probably wrong
-    mutable struct GVCOMMON_s
-        info::Ptr{Ptr{UInt8}}
-        cmdname::Ptr{UInt8}
-        verbose::Cint
-        config::UInt8
-        auto_outfile_names::UInt8
-        errorfn::Ptr{Cvoid}
-        show_boxes::Ptr{Ptr{Cvoid}}
-        lib::Ptr{Ptr{Cvoid}}
-        viewNum::Cint
-        builtins::Ptr{Cvoid}
-        demand_loading::Cint
-    end
-
-    mutable struct GVC_s
-        common::GVCOMMON_s
-
-        config_path::Ptr{UInt8}
-        config_found::UInt8
-
-        input_filenames::Ptr{Ptr{UInt8}}
-
-        gvgs::Ptr{Cvoid}
-        gvg::Ptr{Cvoid}
-
-        # Hack until tuples are properly inlined into types
-        apis0::Ptr{Cvoid}
-        apis1::Ptr{Cvoid}
-        apis2::Ptr{Cvoid}
-        apis3::Ptr{Cvoid}
-        apis4::Ptr{Cvoid}
-        api0::Ptr{Cvoid}
-        api1::Ptr{Cvoid}
-        api2::Ptr{Cvoid}
-        api3::Ptr{Cvoid}
-        api4::Ptr{Cvoid}
-        packages::Ptr{Cvoid}
-
-        #  size_t (*write_fn) (GVJ_t *job, const char *s, size_t len);
-        write_fn::Ptr{Cvoid}
-
-        # More stuff I don't need right now
-    end
-
-    mutable struct GVJ_s
-        gvc::Ptr{GVC_s}
-        next::Ptr{GVJ_s}
-        next_active::Ptr{GVJ_s}
-
-        common::Ptr{Cvoid}
-
-        obj_state::Ptr{Cvoid}
-        input_filename::Ptr{UInt8}
-        graph_index::Cint
-
-        layout_type::Ptr{UInt8}
-
-        output_filename::Ptr{UInt8}
-        output_file::Ptr{Cvoid}
-        output_data::Ptr{UInt8}
-        output_data_allocated::Cuint
-        output_data_position::Cuint
-
-        output_langname::Ptr{UInt8}
-        output_lang::Ptr{Cint}
-
-        render::gvplugin_active_render_t
-        device::gvplugin_active_device_t
-        loadimage::gvplugin_active_loadimage_t
-
-        callbacks::Ptr{gvdevice_callback_t}
-
-        device_dpi::Pointf
-        device_sets_dpi::UInt8
-
-        displat::Ptr{Cvoid}
-        screen::Cint
-
-        context::Ptr{Cvoid}
-        external_context::UInt8
-
-        imagedata::Ptr{UInt8}
-
-        flags::Cint
-
-        numLayers::Cint
-        layerNum::Cint
-
-        pagesArraySize::Point{Int32}
-        pagesArrayFirst::Point{Int32}
-        pagesArrayMajor::Point{Int32}
-        pagesArrayMinor::Point{Int32}
-        pagesArrayElem::Point{Int32}
-        numPages::Cint
-
-        bb::Box{Float64}
-        pad::Point{Float64}
-        clip::Box{Float64}
-        pageBox::Box{Float64}
-        pageSize::Point{Float64}
-        focus::Point{Float64}
-
-        zoom::Float64
-        rotation::Cint
-
-        view::Point{Float64}
-        canvasBox::Box{Float64}
-        margin::Point{Float64}
-
-        dpi::Point{Float64}
-
-        width::UInt32
-        height::UInt32
-
-        pageBoundingBox::Box{Int32}
-        boundingBox::Box{Int32}
-
-        scale::Point{Float64}
-        translation::Point{Float64}
-        devscale::Point{Float64}
-
-        fit_mode::UInt8
-        needs_refresh::UInt8
-        click::UInt8
-        has_grown::UInt8
-        has_been_rendered::UInt8
-
-        button::UInt8
-        pointer::Point{Float64}
-        oldpointer::Point{Float64}
-
-        current_obj::Ptr{Cvoid}
-        selected_obj::Ptr{Cvoid}
-
-        active_tooltip::Ptr{UInt8}
-        selected_href::Ptr{UInt8}
-
-        selected_obj_type_name::gv_argvlist_t
-        selected_obj_attributes::gv_argvlist_t
-
-        window::Ptr{Cvoid}
-
-        keybindings::Ptr{Cvoid}
-        numkeys::Cint
-        keycodes::Ptr{Cvoid}
-    end
-
-    # Disciplines
-
-
-    struct Agmemdisc_s      
-        #void *(*open) (Agdisc_t*);  /* independent of other resources */
-        open::Ptr{Cvoid}
-        #void *(*alloc) (void *state, size_t req);
-        alloc::Ptr{Cvoid}
-        #void *(*resize) (void *state, void *ptr, size_t old, size_t req);
-        resize::Ptr{Cvoid}
-        # void (*free) (void *state, void *ptr);
-        free::Ptr{Cvoid}
-        # void (*close) (void *state);
-        close::Ptr{Cvoid}
-    end
-
-    struct Agiddisc_s
-        # void *(*open) (Agraph_t * g, Agdisc_t*);    /* associated with a graph */
-        open::Ptr{Cvoid}
-        # long (*map) (void *state, int objtype, char *str, unsigned long *id, int createflag);
-        map::Ptr{Cvoid}
-        # long (*alloc) (void *state, int objtype, unsigned long id);
-        alloc::Ptr{Cvoid}
-        #void (*free) (void *state, int objtype, unsigned long id);
-        free::Ptr{Cvoid}
-        #char *(*print) (void *state, int objtype, unsigned long id);
-        print::Ptr{Cvoid}
-        #void (*close) (void *state);
-        close::Ptr{Cvoid}
-        #void (*idregister) (void *state, int objtype, void *obj);
-        idregister::Ptr{Cvoid}
-    end
-
-    struct Agiodisc_s
-        # int (*afread) (void *chan, char *buf, int bufsize);
-        afread::Ptr{Cvoid}
-        # int (*putstr) (void *chan, const char *str);
-        putstr::Ptr{Cvoid}
-        # int (*flush) (void *chan);  /* sync */
-        flush::Ptr{Cvoid}
-    end
-
-    struct Agdisc_s
-        mem::Ptr{Agmemdisc_s}
-        id::Ptr{Agiddisc_s}
-        io::Ptr{Agiodisc_s}
-    end
-
-    function jl_afread(io::Ptr{Cvoid}, buf::Ptr{UInt8}, bufsize::Cint)
+    function jl_afread(io::IO, buf::Ptr{UInt8}, bufsize::Cint)
         #@show (io,buf,bufsize)
-        ret = readbytes!(unsafe_pointer_to_objref(io)::IO,unsafe_wrap(Array,buf,Int(bufsize)))
+        ret = readbytes!(io,unsafe_wrap(Array,buf,Int(bufsize)))
         #@show ret
         convert(Cint,ret)
     end
 
-    function jl_putstr(io::Ptr{Cvoid}, str::Ptr{UInt8})
+    function jl_putstr(io::IO, str::Ptr{UInt8})
         #@show (io,str)
-        convert(Cint,write(unsafe_pointer_to_objref(io)::IO,unsafe_wrap(Array,str,Int(ccall(:strlen,Csize_t,(Ptr{UInt8},),str)))))::Cint
+        convert(Cint,write(io,unsafe_wrap(Array,str,Int(ccall(:strlen,Csize_t,(Ptr{UInt8},),str)))))::Cint
     end
 
-    jl_flush(io::Ptr{Cvoid}) = convert(Cint,0)
-
-
-    const JuliaIODisc = [Agiodisc_s(
-        @cfunction(jl_afread,Cint,(Ptr{Cvoid},Ptr{UInt8},Cint)),
-        @cfunction(jl_putstr,Cint,(Ptr{Cvoid},Ptr{UInt8})),
-        @cfunction(jl_flush,Cint,(Ptr{Cvoid},))
-    )]
+    jl_flush(io::IO) = convert(Cint,0)
 
 
     null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(Int32(0),convert(Ptr{UInt8},0),
@@ -362,16 +33,16 @@ module GraphViz
 
     mutable struct Context
         handle::Ptr{Cvoid}
-        function Context() 
-            this = new(ccall((:gvContext,gvc),Ptr{Cvoid},()))
-            finalizer(free,this)
+        function Context()
+            this = new(ccall((:gvContext,libgvc),Ptr{Cvoid},()))
+            finalizer(free, this)
             this
         end
     end
 
-    function free(t::Context) 
+    function free(t::Context)
         if t.handle != C_NULL
-            ccall((:gvFreeContext,gvc), Cvoid, (Ptr{Cvoid},), t.handle)
+            ccall((:gvFreeContext,libgvc), Cvoid, (Ptr{Cvoid},), t.handle)
         end
         t.handle = C_NULL
     end
@@ -385,34 +56,40 @@ module GraphViz
         didlayout::Bool
         function Graph(p::Ptr{Cvoid})
             this = new(p,false)
-            finalizer(this,free)
+            finalizer(free, this)
             this
         end
     end
 
     function free(g::Graph)
         if g.handle != C_NULL
-            ccall((:agclose,cgraph), Cint, (Ptr{Cvoid},), g.handle)
+            ccall((:agclose,libcgraph), Cint, (Ptr{Cvoid},), g.handle)
         end
         g.handle = C_NULL
     end
 
-    Graph(graph::IO) = Graph(ccall((:agread,cgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,[Agdisc_s(
-        cglobal((:AgMemDisc,cgraph)),
-        cglobal((:AgIdDisc,cgraph)),
-        pointer(JuliaIODisc)
-        )]))
+    function Graph(graph::IO)
+        iodisc = Ref(Agiodisc_s(
+            @cfunction(jl_afread,Cint,(Any,Ptr{UInt8},Cint)),
+            @cfunction(jl_putstr,Cint,(Any,Ptr{UInt8})),
+            @cfunction(jl_flush,Cint,(Any,))))
+        discs = Ref(Agdisc_s(cglobal((:AgMemDisc,libcgraph)),
+            cglobal((:AgIdDisc,libcgraph)),
+            Base.unsafe_convert(Ptr{Agiodisc_s}, iodisc)))
+        Graph(@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs))
+    end
     Graph(graph::Vector{UInt8}) = Graph(IOBuffer(graph))
-    Graph(graph::String) = Graph(unsafe_wrap(Vector{UInt8}, graph))
+    Graph(graph::String) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph))
 
-    function layout!(g::Graph;engine="neato", context = default_context)
+    function layout!(g::Graph;engine="neato", context = default_context[])
         @assert g.handle != C_NULL
-        ccall((:gvLayout,gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8}),context.handle,g.handle,engine)
-        g.didlayout = true
+        if ccall((:gvLayout,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8}),context.handle,g.handle,engine) == 0
+            g.didlayout = true
+        end
     end
 
-    render_x11(c::Context,g::Graph) = ccall((:gvRender,gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),c.handle,g.handle,"x11",C_NULL)
-    render_jobs(c::Context,g::Graph) = ccall((:gvRenderJobs,gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid}),c.handle,g.handle)
+    render_x11(c::Context,g::Graph) = ccall((:gvRender,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),c.handle,g.handle,"x11",C_NULL)
+    render_jobs(c::Context,g::Graph) = ccall((:gvRenderJobs,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid}),c.handle,g.handle)
 
     # Render
 
@@ -447,7 +124,7 @@ module GraphViz
         # This function has void return
         nothing
     end
-    function julia_io_finalize(firstjob::Ptr{Cvoid}) 
+    function julia_io_finalize(firstjob::Ptr{Cvoid})
         # Reset the write pointer we changed in julia_io_initialize
         firstjob = convert(Ptr{GVJ_s},firstjob)
         job = unsafe_load(firstjob)
@@ -459,33 +136,38 @@ module GraphViz
         nothing
     end
 
-    const default_context = GraphViz.Context()
+    const default_context = Ref{Context}()
 
-    const julia_io_engine = [ gvdevice_engine_t(@cfunction(julia_io_initialize,Cvoid,(Ptr{Cvoid},)),C_NULL,@cfunction(julia_io_finalize,Cvoid,(Ptr{Cvoid},))) ]
-    const julia_io_features = [ gvdevice_features_t(Int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.) ]
-    const julia_io_name = unsafe_wrap(Vector{UInt8}, "julia_io:svg")
-    const julia_io_libname = unsafe_wrap(Vector{UInt8}, "julia_io")
-    const julia_io_device = 
-    [ 
-      gvplugin_installed_t(Int32(0),pointer(julia_io_name), Int32(0), pointer(julia_io_engine), pointer(julia_io_features));
-      null(gvplugin_installed_t)
-    ]
-    const julia_io_api = 
-    [
-        gvplugin_api_t(API_device, pointer(julia_io_device))
-        null(gvplugin_api_t)
-    ]
+    const julia_io_engine = Ref{gvdevice_engine_t}()
+    const julia_io_features = Ref{gvdevice_features_t}(gvdevice_features_t(Int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.))
+    const julia_io_name = Vector{UInt8}("julia_io:svg")
+    const julia_io_libname = Vector{UInt8}("julia_io")
+    const julia_io_device = Ref{NTuple{2, gvplugin_installed_t}}()
+    const julia_io_api = Ref{NTuple{2, gvplugin_api_t}}()
 
-    add_julia_io!(c::Context) = ccall((:gvAddLibrary,gvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(julia_io_libname),pointer(julia_io_api))])
+    function init_io_structs!()
+        julia_io_engine[] = gvdevice_engine_t(@cfunction(julia_io_initialize,Cvoid,(Ptr{Cvoid},)),C_NULL,@cfunction(julia_io_finalize,Cvoid,(Ptr{Cvoid},)))
+        julia_io_device[] = (
+            gvplugin_installed_t(Int32(0),pointer(julia_io_name), Int32(0), unsafe_convert(Ptr{gvdevice_engine_t}, julia_io_engine), unsafe_convert(Ptr{gvdevice_features_t}, julia_io_features)),
+            null(gvplugin_installed_t)
+        )
+        julia_io_api[] = (gvplugin_api_t(API_device, unsafe_convert(Ptr{gvplugin_installed_t}, julia_io_device)),
+            null(gvplugin_api_t))
+    end
 
-    function render(io::IO,g::GraphViz.Graph; context = default_context, format="julia_io:svg")
-        GraphViz.add_julia_io!(context)
+    function add_julia_io!(c::Context)
+        lib = Ref{gvplugin_library_t}(gvplugin_library_t(
+            pointer(julia_io_libname),unsafe_convert(Ptr{gvplugin_api_t}, julia_io_api)))
+        ccall((:gvAddLibrary,libgvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,lib)
+    end
+
+    function render(io::IO,g::GraphViz.Graph; context = default_context[], format="julia_io:svg")
         if !g.didlayout
             error("Must call layout before calling render!")
         end
         state = IODeviceState(io,C_NULL)
         active_devices[state] = state
-        ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),context.handle,g.handle,format,state)
+        ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),context.handle,g.handle,format,state)
     end
 
     function Base.show(io::IO, ::MIME"image/svg+xml", x::Graph)
@@ -495,163 +177,11 @@ module GraphViz
         render(io,x)
     end
 
-    # Cairo device
-
-    using Cairo
-
-    function cairo_initialize(firstjob::Ptr{Cvoid})
-        firstjob = convert(Ptr{GVJ_s},firstjob)
-        job = unsafe_load(firstjob)
-        if job.context != C_NULL
-            c = unsafe_pointer_to_objref(job.context)::CairoContext
-            job.context = c.ptr
-            job.external_context    = 0x1
-            job.width = width(c.surface)
-            job.height = height(c.surface)
-            unsafe_store!(firstjob,job)
-        else
-            job.external_context = 1
-            unsafe_store!(firstjob,job)
-            global last_surface = firstjob
-        end
-        nothing
-    end
-
-    global last_surface = nothing
-
-    function cairo_finalize(firstjob::Ptr{Cvoid})
-        #=firstjob = convert(Ptr{GVJ_s},firstjob)
-        job = unsafe_load(firstjob)
-        if last_surface == firstjob
-            surface = ccall((:cairo_get_target,Cairo._jl_libcairo),Ptr{Cvoid},(Ptr{Cvoid},),job.context)
-            last_surface = CairoSurface(surface, job.width, job.height)
-        end=#
-        nothing
-    end
-
-    function cairo_format(firstjob::Ptr{Cvoid})
-        global last_surface
-        firstjob = convert(Ptr{GVJ_s},firstjob)
-        job = unsafe_load(firstjob)
-        if last_surface == firstjob
-            surface = ccall((:cairo_get_target,Cairo._jl_libcairo),Ptr{Cvoid},(Ptr{Cvoid},),job.context)
-            last_surface = CairoSurface(surface, job.width, job.height)
-        end
-        nothing
-    end
-
-    const generic_cairo_engine = [ gvdevice_engine_t(@cfunction(cairo_initialize,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_format,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_finalize,Cvoid,(Ptr{Cvoid},))) ]
-    const generic_cairo_features = [ gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.) ]
-    const generic_cairo_features_interactive = [ gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.) ]
-    const generic_cairo_name = unsafe_wrap(Vector{UInt8}, "julia:cairo")
-    const generic_cairo_libname = unsafe_wrap(Vector{UInt8}, "julia:cairo")
-    const generic_cairo_device = 
-    [ 
-      gvplugin_installed_t(Int32(0),pointer(generic_cairo_name), Int32(0), pointer(generic_cairo_engine), pointer(generic_cairo_features));
-      null(gvplugin_installed_t)
-    ]
-    const generic_cairo_api = 
-    [
-        gvplugin_api_t(API_device, pointer(generic_cairo_device))
-        null(gvplugin_api_t)
-    ]
-
-    add_julia_cairo!(c::Context) = ccall((:gvAddLibrary,gvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(generic_cairo_libname),pointer(generic_cairo_api))])
-
-    function render(c::CairoContext,g::GraphViz.Graph; context = default_context, format="julia:cairo")
-        GraphViz.add_julia_cairo!(context)
-        if !g.didlayout
-            error("Must call layout before calling render!")
-        end
-        ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),context.handle,g.handle,format,c)
-    end
-
-    function cairo_render(g::GraphViz.Graph; context = default_context, format="julia:cairo")
-        global last_surface
-        GraphViz.add_julia_cairo!(context)
-        if !g.didlayout
-            error("Must call layout before calling render!")
-        end
-        ccall((:gvRenderContext,GraphViz.gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),context.handle,g.handle,format,C_NULL)
-        surface = last_surface
-        last_surface = nothing
-        return surface
-    end
-
-    function Base.show(io::IO, m::MIME"image/png", x::Graph)
-        if !x.didlayout
-            layout!(x,engine="dot")
-        end
-        show(io, m, cairo_render(x))
-    end
-    #=
-    if isdir(Pkg.dir("Gtk"))
-        using Gtk
-
-        function gtk_initialize(firstjob::Ptr{Cvoid})
-            firstjob = convert(Ptr{GVJ_s},firstjob)
-            job = unsafe_load(firstjob)
-            c = unsafe_pointer_to_objref(job.context)::Gtk.Canvas
-            c.data = firstjob
-            job.context = getgc(c).ptr
-            job.window = pointer_from_objref(c)
-            unsafe_store!(firstjob,job)
-            nothing
-        end
-
-        function gtk_finalize(firstjob::Ptr{Cvoid})
-            firstjob = convert(Ptr{GVJ_s},firstjob)
-            job = unsafe_load(firstjob)
-            c = unsafe_pointer_to_objref(job.window)::Gtk.Canvas
-            draw(gtk_update,c)
-            wait() #TODO: Make conditional on closing the widget
-            nothing
-        end 
-
-        function gtk_update(c::Canvas)
-            jobp = c.data::Ptr{GVJ_s}
-            job = unsafe_load(jobp)
-            job.height              = height(c)
-            job.width               = width(c)
-            job.context             = getgc(c).ptr
-            job.external_context    = 0x1
-            unsafe_store!(jobp,job)
-            println(job.callbacks)
-            println(unsafe_load(job.callbacks).refresh)
-            ccall(unsafe_load(job.callbacks).refresh,Cvoid,(Ptr{Cvoid},),jobp)
-        end
-        const gtk_engine = [ gvdevice_engine_t(@cfunction(gtk_initialize,Cvoid,(Ptr{Cvoid},)),C_NULL,@cfunction(gtk_finalize,Cvoid,(Ptr{Cvoid},))) ]
-        const gtk_features = [ gvdevice_features_t(Int32(GVDEVICE_EVENTS),0.,0.,0.,0.,96.,96.) ]
-        const gtk_name = unsafe_wrap(Vector{UInt8}, "julia_gtk:cairo")
-        const gtk_libname = unsafe_wrap(Vector{UInt8}, "julia_gtk:cairo")
-        const gtk_device = 
-        [ 
-          gvplugin_installed_t(Int32(0),pointer(gtk_name), Int32(0), pointer(gtk_engine), pointer(gtk_features));
-          null(gvplugin_installed_t)
-        ]
-        const gtk_api = 
-        [
-            gvplugin_api_t(API_device, pointer(gtk_device))
-            null(gvplugin_api_t)
-        ]
-
-        add_julia_gtk!(c::Context) = ccall((:gvAddLibrary,gvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,[gvplugin_library_t(pointer(gtk_libname),pointer(gtk_api))])
-
-        function render(c::Gtk.Canvas,cg::Context,g::Graph) 
-            @async begin
-                add_julia_gtk!(cg)
-                ccall((:gvRenderContext,gvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),cg.handle,g.handle,"julia_gtk",c)    
-            end
-            nothing
-        end
-    end
-    =#
-
-    graph_plugins(c::Context) = Graph(ccall((:gvPluginsGraph,gvc),Ptr{Cvoid},(Ptr{Cvoid},),c.handle))
+    graph_plugins(c::Context) = Graph(ccall((:gvPluginsGraph,libgvc),Ptr{Cvoid},(Ptr{Cvoid},),c.handle))
 
     function listPlugins(c,kind)
         s = Array(Cint,1)
-        r = ccall((:gvPluginList,gvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Ptr{UInt8},Ptr{Cint},Ptr{UInt8}),c.handle,kind,s,C_NULL)
+        r = ccall((:gvPluginList,libgvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Ptr{UInt8},Ptr{Cint},Ptr{UInt8}),c.handle,kind,s,C_NULL)
         if r == C_NULL
             error("No Plugins available")
         end
@@ -662,5 +192,13 @@ module GraphViz
         end
         c_free(r)
         ret
+    end
+
+    function __init__()
+        @require Cairo="159f3aea-2a34-519c-b102-8c37f9878175" include("cairo.jl")
+        @require Gtk="4c0ca9eb-093a-5379-98c5-f87ac0bbbf44" include("gtk.jl")
+        default_context[] = Context()
+        init_io_structs!()
+        add_julia_io!(default_context[])
     end
 end
