@@ -1,8 +1,11 @@
 # GraphViz.jl
 
-This package provides an interface to the the `GraphViz` package for graph visualization. The primary export is the
-`Graph` type. The `Graph` type accepts graph in [DOT](http://en.wikipedia.org/wiki/DOT_(graph_description_language)) format.
-You may either pass in an IO object (see the below examples) from which to read the graph or pass it in as a string or memory blob (in form of a `Uint8` array). GraphViz will copy the graph so you do not need to worry about the memory being passed in.
+This package provides an interface to the the `GraphViz` package for graph visualization. There are two primary entry points:
+ - The `GraphViz.load` function (not exported) to load graphs from a file
+ - The `dot"""` string macro for literal inline specifications of graphs
+
+Both of these accept `Graph` type accepts graph in [DOT](http://en.wikipedia.org/wiki/DOT_(graph_description_language)) format.
+To load a graph from a non-constant string, use `GraphViz.load` with an `IOBuffer`.
 
 # Getting started
 If you already have a graph you would like to work with, the following code snippets may be helpful. If not, have a look
