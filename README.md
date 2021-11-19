@@ -1,16 +1,16 @@
 # GraphViz.jl
 
-This package provides an interface to the the `GraphViz` package for graph visualization. The primary export is the 
+This package provides an interface to the the `GraphViz` package for graph visualization. The primary export is the
 `Graph` type. The `Graph` type accepts graph in [DOT](http://en.wikipedia.org/wiki/DOT_(graph_description_language)) format.
-You may either pass in an IO object (see the below examples) from which to read the graph or pass it in as a string or memory blob (in form of a `Uint8` array). GraphViz will copy the graph so you do not need to worry about the memory being passed in. 
+You may either pass in an IO object (see the below examples) from which to read the graph or pass it in as a string or memory blob (in form of a `Uint8` array). GraphViz will copy the graph so you do not need to worry about the memory being passed in.
 
 # Getting started
 If you already have a graph you would like to work with, the following code snippets may be helpful. If not, have a look
 at the "Simple Examples" section below
 ```
 using GraphViz
-open(Graph,"mygraph.dot")
-Graph("""
+GraphViz.load("mygraph.dot")
+dot"""
  digraph graphname {
      a -> b -> c;
      b -> d;
@@ -33,7 +33,7 @@ by default.
 Try the following in an IJulia Notebook (this example is taken from [here](http://en.wikipedia.org/wiki/DOT_(graph_description_language))):
 
 ```
-Graph("""
+dot"""
 graph graphname {
      // The label attribute can be used to change the label of a node
      a [label="Foo"];
@@ -43,4 +43,5 @@ graph graphname {
      a -- b -- c [color=blue];
      b -- d [style=dotted];
  }
-""")
+"""
+```

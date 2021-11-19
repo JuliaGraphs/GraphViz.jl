@@ -47,10 +47,14 @@ module GraphViz
         t.handle = C_NULL
     end
 
-    # API - Graph
+    # External API
+    export dot_str
 
-    export Graph
+    macro dot_str(str)
+        :($Graph($str))
+    end
 
+    # Graph handle
     mutable struct Graph
         handle::Ptr{Cvoid}
         didlayout::Bool
@@ -80,6 +84,9 @@ module GraphViz
     end
     Graph(graph::Vector{UInt8}) = Graph(IOBuffer(graph))
     Graph(graph::String) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph))
+
+    load(f::File{format"DOT"}) = open(Graph, f)
+
 
     function layout!(g::Graph;engine="neato", context = default_context[])
         @assert g.handle != C_NULL

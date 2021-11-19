@@ -1,17 +1,18 @@
 name = "GraphViz"
 uuid = "f526b714-d49f-11e8-06ff-31ed36ee7ee0"
-version = "0.2"
+version = "0.2.0"
+
+[deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+Graphviz_jll = "3c863552-8265-54e4-a6dc-903eb78fde85"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+
+[compat]
+Graphviz_jll = ">= 2.49.3"
 
 [extras]
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[deps]
-Graphviz_jll = "3c863552-8265-54e4-a6dc-903eb78fde85"
-Requires = "ae029012-a4dd-5104-9daa-d747884805df"
-
 [targets]
 test = ["Test", "Cairo"]
-
-[compat]
-Graphviz_jll = ">= 2.49.3"
