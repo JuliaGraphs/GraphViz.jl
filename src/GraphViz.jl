@@ -2,6 +2,7 @@ module GraphViz
 
     using Requires
     using Graphviz_jll
+    using FileIO
     using Base: unsafe_convert
 
     include("capi.jl")
