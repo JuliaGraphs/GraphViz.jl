@@ -49,7 +49,7 @@ module GraphViz
     end
 
     # External API
-    export dot_str
+    export @dot_str
 
     macro dot_str(str)
         :($Graph($str))
