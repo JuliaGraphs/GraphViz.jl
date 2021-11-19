@@ -87,7 +87,7 @@ module GraphViz
     Graph(graph::String) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph))
 
     load(f::File{format"DOT"}) = open(Graph, f)
-
+    load(io::IO) = Graph(io)
 
     function layout!(g::Graph;engine="neato", context = default_context[])
         @assert g.handle != C_NULL
