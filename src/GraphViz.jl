@@ -195,9 +195,12 @@ module GraphViz
     end
 
     function __init__()
-        @require Cairo="159f3aea-2a34-519c-b102-8c37f9878175" include("cairo.jl")
-        @require Gtk="4c0ca9eb-093a-5379-98c5-f87ac0bbbf44" include("gtk.jl")
         default_context[] = Context()
+        @require Cairo="159f3aea-2a34-519c-b102-8c37f9878175" begin
+            include("cairo.jl")
+            Base.invokelatest(__init__cairo__, default_context[])
+        end
+        #@require Gtk="4c0ca9eb-093a-5379-98c5-f87ac0bbbf44" include("gtk.jl")
         init_io_structs!()
         add_julia_io!(default_context[])
     end
