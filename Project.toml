@@ -11,7 +11,7 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 Graphviz_jll = "2.49.3 - 2"
 julia = "1"
 FileIO = "1"
-Reqiures = "1"
+Requires = "1"
 
 [extras]
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
