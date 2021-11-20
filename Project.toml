@@ -8,7 +8,7 @@ Graphviz_jll = "3c863552-8265-54e4-a6dc-903eb78fde85"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
-Graphviz_jll = ">= 2.49.3"
+Graphviz_jll = "2.49.3 - 2"
 julia = "1"
 FileIO = "1"
 Reqiures = "1"
