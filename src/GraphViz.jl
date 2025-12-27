@@ -73,6 +73,12 @@ module GraphViz
         g.handle = C_NULL
     end
 
+    struct GraphVizError <: Exception
+        msg::String
+    end
+
+    Base.showerror(io::IO, e::GraphVizError) = print(io, "GraphVizError: " * e.msg)
+
     function Graph(graph::IO)
         iodisc = Ref(Agiodisc_s(
             @cfunction(jl_afread,Cint,(Any,Ptr{UInt8},Cint)),
@@ -81,7 +87,11 @@ module GraphViz
         discs = Ref(Agdisc_s(cglobal((:AgMemDisc,libcgraph)),
             cglobal((:AgIdDisc,libcgraph)),
             Base.unsafe_convert(Ptr{Agiodisc_s}, iodisc)))
-        Graph(@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs))
+        graph = Graph(@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs))
+        if graph.handle == C_NULL
+            throw(GraphVizError("Bad input"))
+        end
+        graph
     end
     Graph(graph::Vector{UInt8}) = Graph(IOBuffer(graph))
     Graph(graph::String) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph))
@@ -93,6 +103,8 @@ module GraphViz
         @assert g.handle != C_NULL
         if ccall((:gvLayout,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8}),context.handle,g.handle,engine) == 0
             g.didlayout = true
+        else
+            throw(GraphVizError("Layout failed"))
         end
     end
 
