@@ -45,10 +45,12 @@ end
 
 const julia_cairo_engine = Ref{gvdevice_engine_t}()
 const julia_cairo_features = Ref{gvdevice_features_t}(gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.))
-const julia_cairo_name = Vector{UInt8}("julia:cairo")
-const julia_cairo_libname = Vector{UInt8}("julia:cairo")
+const julia_cairo_name = vcat(Vector{UInt8}("julia:cairo"), UInt8(0))
+const julia_cairo_libname = vcat(Vector{UInt8}("julia:cairo"), UInt8(0))
 const julia_cairo_device = Ref{NTuple{2, gvplugin_installed_t}}()
 const julia_cairo_api = Ref{NTuple{2, gvplugin_api_t}}()
+
+format_placeholder = Vector{UInt8}()
 
 function init_cairo_structs!()
     julia_cairo_engine[] = gvdevice_engine_t(@cfunction(cairo_initialize,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_format,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_finalize,Cvoid,(Ptr{Cvoid},)))
@@ -80,12 +82,21 @@ function render(c::CairoContext,g::GraphViz.Graph; context = default_context[], 
 end
 
 function cairo_render(g::GraphViz.Graph; context = default_context[], format="julia:cairo")
-    global last_surface
+    global last_surface, format_placeholder
     GraphViz.add_julia_cairo!(context)
     if !g.didlayout
         error("Must call layout before calling render!")
     end
-    ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),context.handle,g.handle,format,C_NULL)
+
+    empty!(format_placeholder)
+    append!(format_placeholder, format)
+    push!(format_placeholder, UInt8(0))
+    format_cstring = pointer(format_placeholder)
+
+    ret = ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),context.handle,g.handle,format_cstring,C_NULL)
+    if ret != 0
+        error("gvRenderContext failed with return code: $ret")
+    end
     surface = last_surface
     last_surface = nothing
     return surface
