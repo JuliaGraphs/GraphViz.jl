@@ -48,3 +48,23 @@ graph graphname {
  }
 """
 ```
+
+# Advanced Examples
+
+The default [layout](https://graphviz.org/docs/layouts/) used in this package in `dot`.
+To change the layout, you can access the `engine` attribute of the Graph **before** showing it, or using the constructor `GraphViz.Graph` with the additional keyword attribute `engine=...`.
+
+```
+G = GraphViz.Graph("""
+digraph graphname {
+    rankdir="LR";
+    x [label="{x = 3.0 | ∂x = 2.0 }", shape=record];
+    y [label="{y = 2.0 | ∂y = 3.0 }", shape=record];
+    z [label="{z = 6.0 | ∂z = 1.0 }", shape=record];
+    "z*" [label="*"];
+    x -> "z*";
+    y -> "z*";
+    "z*" -> z;
+}
+""", engine="dot")
+```

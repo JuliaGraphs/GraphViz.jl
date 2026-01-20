@@ -59,8 +59,9 @@ module GraphViz
     mutable struct Graph
         handle::Ptr{Cvoid}
         didlayout::Bool
-        function Graph(p::Ptr{Cvoid})
-            this = new(p,false)
+        engine::String
+        function Graph(p::Ptr{Cvoid}, engine::String)
+            this = new(p,false,engine)
             finalizer(free, this)
             this
         end
@@ -73,7 +74,7 @@ module GraphViz
         g.handle = C_NULL
     end
 
-    function Graph(graph::IO)
+    function Graph(graph::IO; engine::String = "dot")
         iodisc = Ref(Agiodisc_s(
             @cfunction(jl_afread,Cint,(Any,Ptr{UInt8},Cint)),
             @cfunction(jl_putstr,Cint,(Any,Ptr{UInt8})),
@@ -81,15 +82,15 @@ module GraphViz
         discs = Ref(Agdisc_s(cglobal((:AgMemDisc,libcgraph)),
             cglobal((:AgIdDisc,libcgraph)),
             Base.unsafe_convert(Ptr{Agiodisc_s}, iodisc)))
-        Graph(@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs))
+        Graph((@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs)), engine)
     end
-    Graph(graph::Vector{UInt8}) = Graph(IOBuffer(graph))
-    Graph(graph::String) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph))
+    Graph(graph::Vector{UInt8}, args...; kwargs...) = Graph(IOBuffer(graph), args...; kwargs...)
+    Graph(graph::String, args...; kwargs...) = @GC.preserve graph Graph(unsafe_wrap(Vector{UInt8}, graph), args...; kwargs...)
 
     load(f::File{format"DOT"}) = open(Graph, f)
     load(io::IO) = Graph(io)
 
-    function layout!(g::Graph;engine="neato", context = default_context[])
+    function layout!(g::Graph;engine=g.engine, context = default_context[])
         @assert g.handle != C_NULL
         if ccall((:gvLayout,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8}),context.handle,g.handle,engine) == 0
             g.didlayout = true
@@ -180,7 +181,7 @@ module GraphViz
 
     function Base.show(io::IO, ::MIME"image/svg+xml", x::Graph)
         if !x.didlayout
-            layout!(x,engine="neato")
+            layout!(x,engine=x.engine)
         end
         render(io,x)
     end
