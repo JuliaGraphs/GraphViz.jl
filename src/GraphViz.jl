@@ -191,17 +191,18 @@ module GraphViz
     graph_plugins(c::Context) = Graph(ccall((:gvPluginsGraph,libgvc),Ptr{Cvoid},(Ptr{Cvoid},),c.handle))
 
     function listPlugins(c,kind)
-        s = Array(Cint,1)
-        r = ccall((:gvPluginList,libgvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Ptr{UInt8},Ptr{Cint},Ptr{UInt8}),c.handle,kind,s,C_NULL)
+        s = Ref{Cint}()
+        r = ccall((:gvPluginList,libgvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Cstring,Ptr{Cint},Cstring),c.handle,kind,s,C_NULL)
         if r == C_NULL
             error("No Plugins available")
         end
-        ret = Array(ByteString,s[1])
-        for i = 1:s[1]
-            ret[i] = bytestring(unsafe_load(r,i))
-            c_free(unsafe_load(r,i))
+        ret = Vector{String}(undef, s[])
+        for i = 1:s[]
+            p = unsafe_load(r,i)
+            ret[i] = unsafe_string(p)
+            Libc.free(p)
         end
-        c_free(r)
+        Libc.free(r)
         ret
     end
 
