@@ -45,15 +45,15 @@ end
 
 const julia_cairo_engine = Ref{gvdevice_engine_t}()
 const julia_cairo_features = Ref{gvdevice_features_t}(gvdevice_features_t(Int32(0),0.,0.,0.,0.,96.,96.))
-const julia_cairo_name = Vector{UInt8}("julia:cairo")
-const julia_cairo_libname = Vector{UInt8}("julia:cairo")
+const julia_cairo_name = "julia:cairo" # must be global to remain rooted for GC
+const julia_cairo_libname = "julia:cairo" # must be global to remain rooted for GC
 const julia_cairo_device = Ref{NTuple{2, gvplugin_installed_t}}()
 const julia_cairo_api = Ref{NTuple{2, gvplugin_api_t}}()
 
 function init_cairo_structs!()
     julia_cairo_engine[] = gvdevice_engine_t(@cfunction(cairo_initialize,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_format,Cvoid,(Ptr{Cvoid},)),@cfunction(cairo_finalize,Cvoid,(Ptr{Cvoid},)))
     julia_cairo_device[] = (
-        gvplugin_installed_t(Int32(0),pointer(julia_cairo_name), Int32(0), unsafe_convert(Ptr{gvdevice_engine_t}, julia_cairo_engine), unsafe_convert(Ptr{gvdevice_features_t}, julia_cairo_features)),
+        gvplugin_installed_t(Int32(0), unsafe_convert(Cstring, julia_cairo_name), Int32(0), unsafe_convert(Ptr{gvdevice_engine_t}, julia_cairo_engine), unsafe_convert(Ptr{gvdevice_features_t}, julia_cairo_features)),
         null(gvplugin_installed_t)
     )
     julia_cairo_api[] = (gvplugin_api_t(API_device, unsafe_convert(Ptr{gvplugin_installed_t}, julia_cairo_device)),
@@ -62,7 +62,7 @@ end
 
 function add_julia_cairo!(c::Context)
     lib = Ref{gvplugin_library_t}(gvplugin_library_t(
-        pointer(julia_cairo_libname),unsafe_convert(Ptr{gvplugin_api_t}, julia_cairo_api)))
+        unsafe_convert(Cstring, julia_cairo_libname),unsafe_convert(Ptr{gvplugin_api_t}, julia_cairo_api)))
     ccall((:gvAddLibrary,libgvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,lib)
 end
 
@@ -76,7 +76,7 @@ function render(c::CairoContext,g::GraphViz.Graph; context = default_context[], 
     if !g.didlayout
         error("Must call layout before calling render!")
     end
-    ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),context.handle,g.handle,format,c)
+    ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Cstring,Any),context.handle,g.handle,format,c)
 end
 
 function cairo_render(g::GraphViz.Graph; context = default_context[], format="julia:cairo")
@@ -85,7 +85,7 @@ function cairo_render(g::GraphViz.Graph; context = default_context[], format="ju
     if !g.didlayout
         error("Must call layout before calling render!")
     end
-    ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),context.handle,g.handle,format,C_NULL)
+    ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Cstring,Ptr{Cvoid}),context.handle,g.handle,format,C_NULL)
     surface = last_surface
     last_surface = nothing
     return surface

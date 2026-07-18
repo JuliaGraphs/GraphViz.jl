@@ -22,7 +22,7 @@ end
 
 struct gvplugin_installed_t
     id::Cint
-    ctype::Ptr{UInt8}
+    ctype::Cstring
     quality::Cint
     engine::Ptr{gvdevice_engine_t}
     features::Ptr{gvdevice_features_t}
@@ -70,7 +70,7 @@ struct gvplugin_api_t
 end
 
 struct gvplugin_library_t
-    name::Ptr{UInt8}
+    name::Cstring
     apis::Ptr{gvplugin_api_t}
 end
 
@@ -80,24 +80,24 @@ struct gvplugin_active_device_t
     engine::Ptr{gvdevice_engine_t}
     id::Cint
     features::Ptr{gvdevice_features_t}
-    ctype::Ptr{UInt8}
+    ctype::Cstring
 end
 
 struct gvplugin_active_render_t
     engine::Ptr{Cvoid}
     id::Cint
     features::Ptr{Cvoid}
-    ctype::Ptr{UInt8}
+    ctype::Cstring
 end
 
 struct gvplugin_active_loadimage_t
     engine::Ptr{Cvoid}
     id::Cint
-    ctype::Ptr{UInt8}
+    ctype::Cstring
 end
 
 struct gv_argvlist_t
-    argv::Ptr{Ptr{UInt8}}
+    argv::Ptr{Cstring}
     argc::Cint;
     alloc::Cint;
 end
@@ -126,8 +126,8 @@ end
 
 # TODO: These are probably wrong
 mutable struct GVCOMMON_s
-    info::Ptr{Ptr{UInt8}}
-    cmdname::Ptr{UInt8}
+    info::Ptr{Cstring}
+    cmdname::Cstring
     verbose::Cint
     config::UInt8
     auto_outfile_names::UInt8
@@ -142,10 +142,10 @@ end
 mutable struct GVC_s
     common::GVCOMMON_s
 
-    config_path::Ptr{UInt8}
+    config_path::Cstring
     config_found::UInt8
 
-    input_filenames::Ptr{Ptr{UInt8}}
+    input_filenames::Ptr{Cstring}
 
     gvgs::Ptr{Cvoid}
     gvg::Ptr{Cvoid}
@@ -177,18 +177,18 @@ mutable struct GVJ_s
     common::Ptr{Cvoid}
 
     obj_state::Ptr{Cvoid}
-    input_filename::Ptr{UInt8}
+    input_filename::Cstring
     graph_index::Cint
 
-    layout_type::Ptr{UInt8}
+    layout_type::Cstring
 
-    output_filename::Ptr{UInt8}
+    output_filename::Cstring
     output_file::Ptr{Cvoid}
     output_data::Ptr{UInt8}
     output_data_allocated::Cuint
     output_data_position::Cuint
 
-    output_langname::Ptr{UInt8}
+    output_langname::Cstring
     output_lang::Ptr{Cint}
 
     render::gvplugin_active_render_t
@@ -259,8 +259,8 @@ mutable struct GVJ_s
     current_obj::Ptr{Cvoid}
     selected_obj::Ptr{Cvoid}
 
-    active_tooltip::Ptr{UInt8}
-    selected_href::Ptr{UInt8}
+    active_tooltip::Cstring
+    selected_href::Cstring
 
     selected_obj_type_name::gv_argvlist_t
     selected_obj_attributes::gv_argvlist_t

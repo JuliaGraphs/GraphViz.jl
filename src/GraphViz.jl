@@ -9,20 +9,21 @@ module GraphViz
 
     function jl_afread(io::IO, buf::Ptr{UInt8}, bufsize::Cint)
         #@show (io,buf,bufsize)
-        ret = readbytes!(io,unsafe_wrap(Array,buf,Int(bufsize)))
-        #@show ret
-        convert(Cint,ret)
+        nbytes = readbytes!(io, unsafe_wrap(Array, buf, Int(bufsize)))
+        #@show nbytes
+        convert(Cint, nbytes)
     end
 
-    function jl_putstr(io::IO, str::Ptr{UInt8})
-        #@show (io,str)
-        convert(Cint,write(io,unsafe_wrap(Array,str,Int(ccall(:strlen,Csize_t,(Ptr{UInt8},),str)))))::Cint
+    function jl_putstr(io::IO, str::Cstring)
+        #@show (io, str)
+        nbytes = write(io, unsafe_string(str))
+        convert(Cint, nbytes)
     end
 
     jl_flush(io::IO) = convert(Cint,0)
 
 
-    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(Int32(0),convert(Ptr{UInt8},0),
+    null(::Type{gvplugin_installed_t}) = gvplugin_installed_t(Int32(0),Cstring(C_NULL),
         Int32(0),convert(Ptr{gvdevice_engine_t},0),convert(Ptr{gvdevice_features_t},0))
     null(::Type{gvplugin_api_t}) = gvplugin_api_t(Int32(0),convert(Ptr{gvplugin_installed_t},0))
 
@@ -76,7 +77,7 @@ module GraphViz
     function Graph(graph::IO)
         iodisc = Ref(Agiodisc_s(
             @cfunction(jl_afread,Cint,(Any,Ptr{UInt8},Cint)),
-            @cfunction(jl_putstr,Cint,(Any,Ptr{UInt8})),
+            @cfunction(jl_putstr,Cint,(Any,Cstring)),
             @cfunction(jl_flush,Cint,(Any,))))
         discs = Ref(Agdisc_s(cglobal((:AgMemDisc,libcgraph)),
             cglobal((:AgIdDisc,libcgraph)),
@@ -91,12 +92,12 @@ module GraphViz
 
     function layout!(g::Graph;engine="neato", context = default_context[])
         @assert g.handle != C_NULL
-        if ccall((:gvLayout,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8}),context.handle,g.handle,engine) == 0
+        if ccall((:gvLayout,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Cstring),context.handle,g.handle,engine) == 0
             g.didlayout = true
         end
     end
 
-    render_x11(c::Context,g::Graph) = ccall((:gvRender,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Ptr{Cvoid}),c.handle,g.handle,"x11",C_NULL)
+    render_x11(c::Context,g::Graph) = ccall((:gvRender,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Cstring,Ptr{Cvoid}),c.handle,g.handle,"x11",C_NULL)
     render_jobs(c::Context,g::Graph) = ccall((:gvRenderJobs,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid}),c.handle,g.handle)
 
     # Render
@@ -148,15 +149,15 @@ module GraphViz
 
     const julia_io_engine = Ref{gvdevice_engine_t}()
     const julia_io_features = Ref{gvdevice_features_t}(gvdevice_features_t(Int32(GVDEVICE_DOES_TRUECOLOR|GVDEVICE_DOES_LAYERS),0.,0.,0.,0.,72.,72.))
-    const julia_io_name = Vector{UInt8}("julia_io:svg")
-    const julia_io_libname = Vector{UInt8}("julia_io")
+    const julia_io_name = "julia_io:svg" # must be global to remain rooted for GC
+    const julia_io_libname = "julia_io" # must be global to remain rooted for GC
     const julia_io_device = Ref{NTuple{2, gvplugin_installed_t}}()
     const julia_io_api = Ref{NTuple{2, gvplugin_api_t}}()
 
     function init_io_structs!()
         julia_io_engine[] = gvdevice_engine_t(@cfunction(julia_io_initialize,Cvoid,(Ptr{Cvoid},)),C_NULL,@cfunction(julia_io_finalize,Cvoid,(Ptr{Cvoid},)))
         julia_io_device[] = (
-            gvplugin_installed_t(Int32(0),pointer(julia_io_name), Int32(0), unsafe_convert(Ptr{gvdevice_engine_t}, julia_io_engine), unsafe_convert(Ptr{gvdevice_features_t}, julia_io_features)),
+            gvplugin_installed_t(Int32(0), unsafe_convert(Cstring, julia_io_name), Int32(0), unsafe_convert(Ptr{gvdevice_engine_t}, julia_io_engine), unsafe_convert(Ptr{gvdevice_features_t}, julia_io_features)),
             null(gvplugin_installed_t)
         )
         julia_io_api[] = (gvplugin_api_t(API_device, unsafe_convert(Ptr{gvplugin_installed_t}, julia_io_device)),
@@ -165,7 +166,9 @@ module GraphViz
 
     function add_julia_io!(c::Context)
         lib = Ref{gvplugin_library_t}(gvplugin_library_t(
-            pointer(julia_io_libname),unsafe_convert(Ptr{gvplugin_api_t}, julia_io_api)))
+            unsafe_convert(Cstring, julia_io_libname),
+            unsafe_convert(Ptr{gvplugin_api_t}, julia_io_api)
+        ))
         ccall((:gvAddLibrary,libgvc),Cvoid,(Ptr{Cvoid},Ptr{gvplugin_library_t}),c.handle,lib)
     end
 
@@ -175,7 +178,7 @@ module GraphViz
         end
         state = IODeviceState(io,C_NULL)
         active_devices[state] = state
-        ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Ptr{UInt8},Any),context.handle,g.handle,format,state)
+        ccall((:gvRenderContext,libgvc),Cint,(Ptr{Cvoid},Ptr{Cvoid},Cstring,Any),context.handle,g.handle,format,state)
     end
 
     function Base.show(io::IO, ::MIME"image/svg+xml", x::Graph)
