@@ -48,7 +48,6 @@ const GVDEVICE_COMPRESSED_FORMAT    = (1<<10)
 const GVDEVICE_NO_WRITER            = (1<<11)
 const GVRENDER_Y_GOES_DOWN          = (1<<12)
 const GVRENDER_DOES_TRANSFORM       = (1<<13)
-const GVRENDER_DOES_ARROWS          = (1<<14)
 const GVRENDER_DOES_LABELS          = (1<<15)
 const GVRENDER_DOES_MAPS            = (1<<16)
 const GVRENDER_DOES_MAP_RECTANGLE   = (1<<17)
@@ -96,12 +95,6 @@ struct gvplugin_active_loadimage_t
     ctype::Cstring
 end
 
-struct gv_argvlist_t
-    argv::Ptr{Cstring}
-    argc::Cint;
-    alloc::Cint;
-end
-
 struct Point{T}
     x::T
     y::T
@@ -124,16 +117,19 @@ struct gvdevice_callback_t
     render::Ptr{Cvoid}           # void (*render) (GVJ_t * job, const char *format, const char *filename);
 end
 
-# TODO: These are probably wrong
-mutable struct GVCOMMON_s
+# Mirrors of GVCOMMON_t (lib/gvc/gvcommon.h) and the leading fields of
+# GVC_t (lib/gvc/gvcint.h) as of graphviz 15.1.0. GVCOMMON_s must be an
+# immutable struct so that it is stored inline in GVC_s and field offsets
+# match the C layout.
+struct GVCOMMON_s
     info::Ptr{Cstring}
     cmdname::Cstring
     verbose::Cint
-    config::UInt8
-    auto_outfile_names::UInt8
+    config::Bool
+    auto_outfile_names::Bool
     errorfn::Ptr{Cvoid}
-    show_boxes::Ptr{Ptr{Cvoid}}
-    lib::Ptr{Ptr{Cvoid}}
+    show_boxes::Ptr{Cstring}
+    lib::Ptr{Cstring}
     viewNum::Cint
     builtins::Ptr{Cvoid}
     demand_loading::Cint
@@ -143,24 +139,16 @@ mutable struct GVC_s
     common::GVCOMMON_s
 
     config_path::Cstring
-    config_found::UInt8
+    config_found::Bool
 
     input_filenames::Ptr{Cstring}
+    fidx::Cint
 
     gvgs::Ptr{Cvoid}
     gvg::Ptr{Cvoid}
 
-    # Hack until tuples are properly inlined into types
-    apis0::Ptr{Cvoid}
-    apis1::Ptr{Cvoid}
-    apis2::Ptr{Cvoid}
-    apis3::Ptr{Cvoid}
-    apis4::Ptr{Cvoid}
-    api0::Ptr{Cvoid}
-    api1::Ptr{Cvoid}
-    api2::Ptr{Cvoid}
-    api3::Ptr{Cvoid}
-    api4::Ptr{Cvoid}
+    apis::NTuple{5,Ptr{Cvoid}}
+    api::NTuple{5,Ptr{Cvoid}}
     packages::Ptr{Cvoid}
 
     #  size_t (*write_fn) (GVJ_t *job, const char *s, size_t len);
@@ -176,7 +164,7 @@ mutable struct GVJ_s
 
     common::Ptr{Cvoid}
 
-    obj_state::Ptr{Cvoid}
+    obj::Ptr{Cvoid}
     input_filename::Cstring
     graph_index::Cint
 
@@ -185,11 +173,11 @@ mutable struct GVJ_s
     output_filename::Cstring
     output_file::Ptr{Cvoid}
     output_data::Ptr{UInt8}
-    output_data_allocated::Cuint
-    output_data_position::Cuint
+    output_data_allocated::Csize_t
+    output_data_position::Csize_t
 
     output_langname::Cstring
-    output_lang::Ptr{Cint}
+    output_lang::Cint
 
     render::gvplugin_active_render_t
     device::gvplugin_active_device_t
@@ -198,9 +186,9 @@ mutable struct GVJ_s
     callbacks::Ptr{gvdevice_callback_t}
 
     device_dpi::Pointf
-    device_sets_dpi::UInt8
+    device_sets_dpi::Bool
 
-    displat::Ptr{Cvoid}
+    display::Ptr{Cvoid}
     screen::Cint
 
     context::Ptr{Cvoid}
@@ -262,42 +250,24 @@ mutable struct GVJ_s
     active_tooltip::Cstring
     selected_href::Cstring
 
-    selected_obj_type_name::gv_argvlist_t
-    selected_obj_attributes::gv_argvlist_t
-
     window::Ptr{Cvoid}
 
     keybindings::Ptr{Cvoid}
-    numkeys::Cint
+    numkeys::Csize_t
     keycodes::Ptr{Cvoid}
 end
 
 # Disciplines
 
 
-struct Agmemdisc_s
-    #void *(*open) (Agdisc_t*);  /* independent of other resources */
-    open::Ptr{Cvoid}
-    #void *(*alloc) (void *state, size_t req);
-    alloc::Ptr{Cvoid}
-    #void *(*resize) (void *state, void *ptr, size_t old, size_t req);
-    resize::Ptr{Cvoid}
-    # void (*free) (void *state, void *ptr);
-    free::Ptr{Cvoid}
-    # void (*close) (void *state);
-    close::Ptr{Cvoid}
-end
-
 struct Agiddisc_s
     # void *(*open) (Agraph_t * g, Agdisc_t*);    /* associated with a graph */
     open::Ptr{Cvoid}
-    # long (*map) (void *state, int objtype, char *str, unsigned long *id, int createflag);
+    # long (*map) (void *state, int objtype, char *str, IDTYPE *id, int createflag);
     map::Ptr{Cvoid}
-    # long (*alloc) (void *state, int objtype, unsigned long id);
-    alloc::Ptr{Cvoid}
-    #void (*free) (void *state, int objtype, unsigned long id);
+    #void (*free) (void *state, int objtype, IDTYPE id);
     free::Ptr{Cvoid}
-    #char *(*print) (void *state, int objtype, unsigned long id);
+    #char *(*print) (void *state, int objtype, IDTYPE id);
     print::Ptr{Cvoid}
     #void (*close) (void *state);
     close::Ptr{Cvoid}
@@ -315,7 +285,6 @@ struct Agiodisc_s
 end
 
 struct Agdisc_s
-    mem::Ptr{Agmemdisc_s}
     id::Ptr{Agiddisc_s}
     io::Ptr{Agiodisc_s}
 end

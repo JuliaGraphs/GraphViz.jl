@@ -79,8 +79,7 @@ module GraphViz
             @cfunction(jl_afread,Cint,(Any,Ptr{UInt8},Cint)),
             @cfunction(jl_putstr,Cint,(Any,Cstring)),
             @cfunction(jl_flush,Cint,(Any,))))
-        discs = Ref(Agdisc_s(cglobal((:AgMemDisc,libcgraph)),
-            cglobal((:AgIdDisc,libcgraph)),
+        discs = Ref(Agdisc_s(cglobal((:AgIdDisc,libcgraph)),
             Base.unsafe_convert(Ptr{Agiodisc_s}, iodisc)))
         Graph(@GC.preserve iodisc ccall((:agread,libcgraph),Ptr{Cvoid},(Any,Ptr{Cvoid}),graph,discs))
     end
@@ -118,8 +117,7 @@ module GraphViz
         len #Julia doesn't do half things :)
     end
 
-    # determined by counting bytes ;)
-    const WRITEFN_OFFSET = 200
+    const WRITEFN_OFFSET = fieldoffset(GVC_s, findfirst(==(:write_fn), fieldnames(GVC_s)))
 
     function julia_io_initialize(firstjob::Ptr{Cvoid})
         #@show firstjob
@@ -192,7 +190,7 @@ module GraphViz
 
     function listPlugins(c,kind)
         s = Ref{Cint}()
-        r = ccall((:gvPluginList,libgvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Cstring,Ptr{Cint},Cstring),c.handle,kind,s,C_NULL)
+        r = ccall((:gvPluginList,libgvc),Ptr{Ptr{UInt8}},(Ptr{Cvoid},Cstring,Ptr{Cint}),c.handle,kind,s)
         if r == C_NULL
             error("No Plugins available")
         end
