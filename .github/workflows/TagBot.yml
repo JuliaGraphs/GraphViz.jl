@@ -11,5 +11,10 @@ jobs:
     steps:
       - uses: JuliaRegistries/TagBot@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ssh: ${{ secrets.DOCUMENTER_KEY }}
+          # Create TAGBOT_PAT as a repository secret containing a fine-grained PAT
+          # scoped to this repository, with Contents and Workflows: read/write,
+          # and Issues: read/write (failure reports).
+          # GITHUB_TOKEN cannot create releases with workflow changes. An SSH key
+          # only fixes tag pushes; the release API still needs the PAT.
+          # https://github.com/JuliaRegistries/TagBot/blob/master/example.yml
+          token: ${{ secrets.TAGBOT_PAT }}
