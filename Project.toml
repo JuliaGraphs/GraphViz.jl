@@ -1,6 +1,6 @@
 name = "GraphViz"
 uuid = "f526b714-d49f-11e8-06ff-31ed36ee7ee0"
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
