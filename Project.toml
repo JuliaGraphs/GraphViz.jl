@@ -9,7 +9,7 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
 Graphviz_jll = "15"
-julia = "1"
+julia = "1.6"
 FileIO = "1"
 Requires = "1"
 
